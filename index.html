@@ -364,7 +364,7 @@
         
     
     // master toggle (looks same as other checkboxes)
-        addGroupToggle(null, 'Show Before State', true);
+        addGroupToggle(null, 'Check for before colonisation', true);
         
         // subgroup toggles that control both before/after groups
 
@@ -401,6 +401,8 @@
     // Set focus point — where the camera looks
       const focusPoint = new THREE.Vector3(0, 0, 0);
       camera.lookAt(focusPoint);
+      console.log("📍 Camera Position:", camera.position);
+      console.log("🎯 Focus Point:", focusPoint);
 
 
 function addTitleAndCreditsUI(initialTitle = 'Colonisation Progress', initialCredits = `Survey Leader: N/A
