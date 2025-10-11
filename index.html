@@ -288,31 +288,43 @@
       emissiveIntensity: 0.5,
     });
     
-    const labelStyle = {
-      fontSize: 24,
-      color: '#ffffff',
-      backgroundColor: 'transparent',
-    };
-    
-    Object.entries(labels).forEach(([name, pos]) => {
-      const sphere = new THREE.Mesh(
-        new THREE.SphereGeometry(40, 32, 32),
-        nebulaMaterial.clone()
-      );
-      sphere.position.set(...pos);
-      scene.add(sphere);
-    
-      // Optional: Add label using CSS2DRenderer
-      const div = document.createElement('div');
-      div.className = 'label';
-      div.textContent = name;
-      Object.assign(div.style, labelStyle);
-    
-      const label = new THREE.CSS2DObject(div);
-      label.position.set(...pos);
-      scene.add(label);
-    });
+const createTextSprite = (text) => {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  context.font = 'Bold 48px Arial';
+  context.fillStyle = 'rgba(255,255,255,0.8)';
+  context.fillText(text, 0, 50);
 
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(100, 50, 1); // Adjust size as needed
+  return sprite;
+};
+
+Object.entries(labels).forEach(([name, pos]) => {
+  // Ethereal sphere
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(40, 32, 32),
+    new THREE.MeshPhongMaterial({
+      color: 0x9966ff,
+      transparent: true,
+      opacity: 0.3,
+      emissive: 0x330066,
+      emissiveIntensity: 0.5,
+    })
+  );
+  sphere.position.set(...pos);
+  scene.add(sphere);
+
+  // Sprite label
+  const label = createTextSprite(name);
+  label.position.set(pos[0], pos[1] + 60, pos[2]); // Offset above sphere
+  scene.add(label);
+});
+
+    
+  
     
   // add the bounding box 
           const box = new THREE.Box3().setFromObject(model);
