@@ -287,38 +287,54 @@
 
     // point cloud for IGAU before - should be a low opacity blur
     before_IGAU.material.map = sprite_sphere;
-    before_IGAU.material.size = 8.0; // make points larger
-    before_IGAU.material.opacity = 0.8;
+    before_IGAU.material.size = 6.0; // make points larger
+    before_IGAU.material.opacity = 0.6;
     before_IGAU.material.transparent = true;
     before_IGAU.material.depthWrite = false; // prevents z-fighting
     before_IGAU.material.blending = THREE.AdditiveBlending;
+    // Gold color tweak
+    after_IGAU.material.color = new THREE.Color(0xffcc66); // warm gold
+    after_IGAU.material.emissive = new THREE.Color(0xffcc00); // bright gold glow
+    after_IGAU.material.emissiveIntensity = 0.5;
     before_IGAU.material.needsUpdate = true;
 
     // point cloud for IGAU after systems - should be a low opacity blur
     after_IGAU.material.map = sprite_sphere;
-    after_IGAU.material.size = 8.0; // make points larger
-    after_IGAU.material.opacity = 0.8;
+    after_IGAU.material.size = 6.0; // make points larger
+    after_IGAU.material.opacity = 0.6;
     after_IGAU.material.transparent = true;
     after_IGAU.material.depthWrite = false; // prevents z-fighting
     after_IGAU.material.blending = THREE.AdditiveBlending;
+    // Gold color tweak
+    after_IGAU.material.color = new THREE.Color(0xffcc66); // warm gold
+    after_IGAU.material.emissive = new THREE.Color(0xffcc00); // bright gold glow
+    after_IGAU.material.emissiveIntensity = 0.5;
     after_IGAU.material.needsUpdate = true;
 
     // point cloud for mikunn before - should be a low opacity blur
     before_mikunn.material.map = sprite_sphere;
-    before_mikunn.material.size = 8.0; // make points larger
-    before_mikunn.material.opacity = 0.8;
+    before_mikunn.material.size = 6.0; // make points larger
+    before_mikunn.material.opacity = 0.6;
     before_mikunn.material.transparent = true;
     before_mikunn.material.depthWrite = false; // prevents z-fighting
     before_mikunn.material.blending = THREE.AdditiveBlending;
+    // Silver color tweak
+    before_mikunn.material.color = new THREE.Color(0xc0c0c0); // classic silver gray
+    before_mikunn.material.emissive = new THREE.Color(0xddddff); // cool bluish-white glow
+    before_mikunn.material.emissiveIntensity = 0.4;
     before_mikunn.material.needsUpdate = true;
 
     // point cloud for mikunn after systems - should be a low opacity blur
     after_mikunn.material.map = sprite_sphere;
-    after_mikunn.material.size = 8.0; // make points larger
-    after_mikunn.material.opacity = 0.8;
+    after_mikunn.material.size = 6.0; // make points larger
+    after_mikunn.material.opacity = 0.6;
     after_mikunn.material.transparent = true;
     after_mikunn.material.depthWrite = false; // prevents z-fighting
     after_mikunn.material.blending = THREE.AdditiveBlending;
+    // Silver color tweak
+    before_mikunn.material.color = new THREE.Color(0xc0c0c0); // classic silver gray
+    before_mikunn.material.emissive = new THREE.Color(0xddddff); // cool bluish-white glow
+    before_mikunn.material.emissiveIntensity = 0.4;
     after_mikunn.material.needsUpdate = true;
   
          const labels = {
@@ -577,8 +593,8 @@ Yellow - Independent
 Green - Alliance
 Blue - Empire
 Red - Federation
-Orange - IGAU
-Magenta - Mikunn
+Gold- IGAU
+Silver - Mikunn
 Credits: 
 Data from Spansh, EDGALAXYdata.space
 everyone who contributes data to the feeds`) {
@@ -619,7 +635,7 @@ everyone who contributes data to the feeds`) {
 
   const creditsArea = document.createElement('textarea');
   creditsArea.value = initialCredits;
-  creditsArea.rows = 15;
+  creditsArea.rows = 18;
   creditsArea.style.width = '220px';
   creditsArea.style.padding = '6px';
   creditsArea.style.background = 'rgba(255,255,255,0.04)';
