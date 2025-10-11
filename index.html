@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="data:,">
+  <meta charset="UTF-8" />
+  <title>GLTF Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script type="module">
+  //Import modules
+  import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js';
+  import { GLTFLoader } from './GLTFLoader.js';
+  import { OrbitControls } from './OrbitControls.js';
+  
+  // renderer , camera, scene, controls
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111111);
+ 
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+  // Lighting section — right after camera
+  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambient);
+  
+  const hemi = new THREE.HemisphereLight(0x88ccff, 0x222244, 0.6);
+  scene.add(hemi);
+   
+  const directional = new THREE.DirectionalLight(0xffffff, 0.2);
+  directional.position.set(1, 1, 1);
+  scene.add(directional);
+    
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  console.log('Attempting to load GLTF...');
+  
+  // Create a UI container
+    const ui = document.createElement('div');
+    ui.style.position = 'absolute';
+    ui.style.top = '10px';
+    ui.style.left = '10px';
+    ui.style.background = 'rgba(0,0,0,0.7)';
+    ui.style.padding = '10px';
+    ui.style.color = 'white';
+    ui.style.fontFamily = 'sans-serif';
+    ui.style.zIndex = '10';
+    document.body.appendChild(ui);
+  
+  // Functions and helpers
+  
+  // Create axis label sprites
+  function createAxisLabel_old(text, position, color = 0xffffff) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      context.font = '24px sans-serif';
+      context.fillStyle = 'white';
+      context.fillText(text, 0, 24);
+    
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, color });
+      const sprite = new THREE.Sprite(material);
+      sprite.position.copy(position);
+      sprite.scale.set(100, 50, 1);
+      return sprite;
+  }
+     
+  function createAxisLabelMesh(text, position, rotation, color = 0xffffff) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+    
+      const context = canvas.getContext('2d');
+      context.font = '28px sans-serif';
+      context.fillStyle = 'white';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        color,
+  });
+    
+      const geometry = new THREE.PlaneGeometry(100, 40);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+      mesh.rotation.set(rotation.x, rotation.y, rotation.z);
+      return mesh;
+  }
+  
+  const subgroupStates = {
+      AllSystems: true,
+      Criteria: true,
+      IceCrystal: true,
+      SilicateCrystal: true,
+      PodTrees: true,
+      PodSystems: true
+  };  
+  
+  let activeState = 'before'; // default
+
+  //set up import of model 
+  let meshList = [];
+  let sphereMesh = []; // 👈 this will hold meshList[13] once loaded
+  let before_allSystems = [];
+  let after_allSystems = [];
+  let before_criteria = [];
+  let after_criteria = [];
+  let before_silicateCrystal = [];
+  let before_iceCrystal = [];
+  let before_podsystems = [];
+  let before_podtreesystems = [];
+  let after_silicateCrystal = [];
+  let after_iceCrystal = [];
+  let after_podsystems = [];
+  let after_podtreesystems = [];
+  
+  // load the gtlf file 
+  const loader = new GLTFLoader();
+  loader.load('https://precambrianmollusc.github.io/IGAU_KeplerRidge_CrystalSurvey/visualization.gltf', gltf => {
+    const model = gltf.scene;
+    scene.add(model);
+    console.log('GLTF loaded:', model);
+
+  // 🔍 Traverse and log to identoify all scene objects and get rid of any i doint want - I should clean up in the gtlf export!
+  scene.traverse(obj => {
+    console.log(`Object: ${obj.type}, name: ${obj.name || '(unnamed)'}, visible: ${obj.visible}`);
+     if (obj.name === 'mesh14' && obj.type === 'LineSegments') {
+      obj.visible = false; // or scene.remove(obj);
+      console.log('🔧 Hiding PyVista bounding box mesh14');
+    }
+
+  });
+    
+// Traverse the child looking for mesh and points so we can put into groups - at some point need to figure naming in the python export       
+    model.traverse(child => {
+       if (child.isMesh || child.type === 'Points') {
+        meshList.push(child);
+        if (child.name === 'mesh0') before_allSystems = child;
+        if (child.name === 'mesh1') after_allSystems = child;
+        if (child.name === 'mesh2') before_criteria = child;
+        if (child.name === 'mesh3') after_criteria = child;
+        if (child.name === 'mesh4' ) {before_podtreesystems.push(child);}
+        if (child.name === 'mesh5' ) {before_podsystems.push(child);}
+        if (child.name === 'mesh6' ) {after_podtreesystems.push(child);}
+        if (child.name === 'mesh7' ) {after_podsystems.push(child);}
+        if (child.name === 'mesh9' || child.name === 'mesh11' || child.name === 'mesh13'|| child.name === 'mesh14') {before_iceCrystal.push(child);}
+        if (child.name === 'mesh8' || child.name === 'mesh10'|| child.name === 'mesh12'|| child.name === 'mesh15' ) {before_silicateCrystal.push(child);}
+        if (child.name === 'mesh16' || child.name === 'mesh18' || child.name === 'mesh20'|| child.name === 'mesh22'|| child.name === 'mesh23'|| child.name === 'mesh23') {after_iceCrystal.push(child);}
+        if (child.name === 'mesh17' || child.name === 'mesh19'|| child.name === 'mesh21'|| child.name === 'mesh24' ) {after_silicateCrystal.push(child);}
+        if (child.name === 'mesh25') sphereMesh= child;
+        
+        console.log(`Mesh ${meshList.length - 1}:`, child.name || '(unnamed)', child);
+      }
+    });
+    
+    console.log('Total meshes found:', meshList.length);
+
+    // set up the meshes in groups 
+    // BEFORE meshes
+    const beforeMeshes = {
+      AllSystems: [before_allSystems],
+      Criteria: [before_criteria],
+      IceCrystal: before_iceCrystal,
+      SilicateCrystal: before_silicateCrystal,
+      PodTrees: before_podtreesystems,
+      PodSystems: before_podsystems
+      };
+    
+    // AFTER meshes
+    const afterMeshes = {
+      AllSystems: [after_allSystems],
+      Criteria: [after_criteria],
+      IceCrystal: after_iceCrystal,
+      SilicateCrystal: after_silicateCrystal,
+      PodTrees: after_podtreesystems,
+      PodSystems: after_podsystems
+      };
+
+
+    // point cloud for all beforesystems - should be a low opacity blur
+    before_allSystems.material.size = 2.0; // make points larger
+    before_allSystems.material.opacity = 0.3;
+    before_allSystems.material.transparent = true;
+    before_allSystems.material.needsUpdate = true;
+
+    // point cloud for all after systems - should be a low opacity blur
+    after_allSystems.material.size = 2.0; // make points larger
+    after_allSystems.material.opacity = 0.3;
+    after_allSystems.material.transparent = true;
+    after_allSystems.material.needsUpdate = true;
+  
+    // point cloud for the systems that meet criteria but no SPS  we will make this look like spheres
+    const sprite_sphere = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
+    sprite_sphere.colorSpace = THREE.SRGBColorSpace; // ensures correct color rendering
+    console.log('Sprite loaded:', sprite_sphere);
+
+    before_criteria.material.map = sprite_sphere;
+    before_criteria.material.size = 10;
+    before_criteria.material.opacity = 0.7;
+    before_criteria.material.transparent = true;
+    before_criteria.material.depthWrite = false; // prevents z-fighting
+    before_criteria.material.needsUpdate = true;
+    before_criteria.material.blending = THREE.AdditiveBlending;
+    
+    after_criteria.material.map = sprite_sphere;
+    after_criteria.material.size = 10;
+    after_criteria.material.opacity = 0.7;
+    after_criteria.material.transparent = true;
+    after_criteria.material.depthWrite = false; // prevents z-fighting
+    after_criteria.material.needsUpdate = true;
+    after_criteria.material.blending = THREE.AdditiveBlending;
+
+    // set up the sphere for the raduis of NSPs from the center 
+    sphereMesh.material.opacity = 0.3;
+    sphereMesh.material.transparent = true;
+    sphereMesh.material.depthWrite = false;
+    sphereMesh.material.needsUpdate = true;
+
+    // set up the renderings for the differenet NSPs 
+       before_silicateCrystal.forEach(mesh => {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            mat.color = new THREE.Color(0xdddddd);           // slate gray base
+            mat.emissive = new THREE.Color(0x070707);        // subtle inner depth
+            mat.emissiveIntensity = 0.05;
+            mat.metalness = 0.95;                             // high metal content
+            mat.roughness = 0.12;                             // polished but not mirror-like
+            mat.transparent = false;
+            mat.opacity = 1.0;
+            mat.depthWrite = true;
+            mat.needsUpdate = true;
+          });
+        });
+    // set up the renderings for the differenet NSPs 
+       after_silicateCrystal.forEach(mesh => {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            mat.color = new THREE.Color(0x555555);           // slate gray base
+            mat.emissive = new THREE.Color(0x111111);        // subtle inner depth
+            mat.emissiveIntensity = 0.2;
+            mat.metalness = 0.8;                             // high metal content
+            mat.roughness = 0.3;                             // polished but not mirror-like
+            mat.transparent = false;
+            mat.opacity = 1.0;
+            mat.depthWrite = true;
+            mat.needsUpdate = true;
+          });
+        });
+ 
+      before_iceCrystal.forEach(mesh => {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            mat.emissive = new THREE.Color(0xeeeeff);       // spectral white
+            mat.emissiveIntensity = 0.68;                    // brighter than silicates
+            mat.transparent = true;
+            mat.opacity = 0.5;                              // soft translucency
+            mat.depthWrite = false;
+            mat.needsUpdate = true;
+          });
+        });
+      
+      after_iceCrystal.forEach(mesh => {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            mat.emissive = new THREE.Color(0xeeeeff);       // spectral white
+            mat.emissiveIntensity = 0.68;                    // brighter than silicates
+            mat.transparent = true;
+            mat.opacity = 0.5;                              // soft translucency
+            mat.depthWrite = false;
+            mat.needsUpdate = true;
+          });
+        });
+ 
+      before_podtreesystems.forEach(mesh => {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            mat.emissive = new THREE.Color(0x00ff66);       // spectral green
+            mat.emissiveIntensity = 0.5;
+            mat.transparent = true;
+            mat.opacity = 0.4;
+            mat.depthWrite = false;
+            mat.needsUpdate = true;
+          });
+        });
+    
+      before_podsystems.forEach(mesh => {
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        materials.forEach(mat => {
+          mat.color = new THREE.Color(0xb87333);          // copper base
+          mat.emissive = new THREE.Color(0x552200);       // warm inner glow
+          mat.emissiveIntensity = 0.3;
+          mat.metalness = 0.6;                            // simulate metal surface
+          mat.roughness = 0.4;                            // slight polish
+          mat.transparent = true;
+          mat.opacity = 0.9;
+          mat.depthWrite = true;
+          mat.needsUpdate = true;
+        });
+      });
+    
+      after_podtreesystems.forEach(mesh => {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            mat.emissive = new THREE.Color(0x00ff66);       // spectral green
+            mat.emissiveIntensity = 0.5;
+            mat.transparent = true;
+            mat.opacity = 0.4;
+            mat.depthWrite = false;
+            mat.needsUpdate = true;
+          });
+        });
+    
+      after_podsystems.forEach(mesh => {
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        materials.forEach(mat => {
+          mat.color = new THREE.Color(0xb87333);          // copper base
+          mat.emissive = new THREE.Color(0x552200);       // warm inner glow
+          mat.emissiveIntensity = 0.3;
+          mat.metalness = 0.6;                            // simulate metal surface
+          mat.roughness = 0.4;                            // slight polish
+          mat.transparent = true;
+          mat.opacity = 0.9;
+          mat.depthWrite = true;
+          mat.needsUpdate = true;
+        });
+      });
+   
+  // add the bounding box 
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          console.log('Bounding box size:', size);
+          console.log('Bounding box center:', center);
+      
+          camera.position.set(center.x, center.y, center.z + size.length());
+          controls.target.copy(center);
+          controls.update();
+  
+          const boxHelper = new THREE.BoxHelper(model, 0x888888);
+          scene.add(boxHelper);
+          const min = box.min;
+          const max = box.max;
+          const offset = size.length() * 0.1;
+
+          const labelX = createAxisLabelMesh('Galactic X', new THREE.Vector3(min.x + offset, min.y, min.z), new THREE.Euler(0, 0, 0));
+          const labelY = createAxisLabelMesh('Galactic Y', new THREE.Vector3(min.x, min.y + offset, min.z), new THREE.Euler(0, 0, Math.PI / 2));
+          const labelZ = createAxisLabelMesh('Galactic Z', new THREE.Vector3(min.x, min.y, min.z + offset), new THREE.Euler( 0,  - Math.PI / 2, 0));        
+              
+          const labelScale = size.length() * 0.002; // 20% of diagonal length
+          labelX.scale.set(labelScale, labelScale * 0.5, 1);
+          labelY.scale.set(labelScale, labelScale * 0.5, 1);
+          labelZ.scale.set(labelScale, labelScale * 0.5, 1);
+    
+          scene.add(labelX, labelY, labelZ);
+          
+          const arrowLength = size.length() * 0.2;
+          const arrowX = new THREE.ArrowHelper(
+            new THREE.Vector3(1, 0, 0), // direction: +X
+            box.min,                    // origin: bounding box corner
+            arrowLength,
+            0xff4444                    // red
+          );
+          
+          const arrowY = new THREE.ArrowHelper(
+            new THREE.Vector3(0, 1, 0), // direction: +Y
+            box.min,
+            arrowLength,
+            0x44ff44                    // green
+          );
+          
+          const arrowZ = new THREE.ArrowHelper(
+            new THREE.Vector3(0, 0, 1), // direction: +Z
+            box.min,
+            arrowLength,
+            0x4444ff                    // blue
+          );
+          
+          scene.add(arrowX, arrowY, arrowZ);
+        
+    // single visibility updater (uses beforeMeshes and afterMeshes)
+  function updateVisibility() {
+    Object.keys(subgroupStates).forEach(groupName => {
+      const enabled = !!subgroupStates[groupName];
+      (beforeMeshes[groupName] || []).forEach(m => { if (m) m.visible = (activeState === 'before' && enabled); });
+      (afterMeshes[groupName]  || []).forEach(m => { if (m) m.visible = (activeState === 'after'  && enabled); });
+    });
+  }
+
+  // reusable toggle builder. If isMaster is true, checkbox flips before/after; otherwise it's a subgroup toggle.
+  function addGroupToggle(groupArray, labelText, isMaster = false, groupKey = null) {
+    const label = document.createElement('label');
+    label.style.display = 'block';
+    label.style.marginTop = '8px';
+  
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.style.marginRight = '6px';
+  
+    if (isMaster) {
+      // master visual match: checked => before, unchecked => after
+      checkbox.checked = (activeState === 'before');
+      checkbox.addEventListener('change', (e) => {
+        activeState = e.target.checked ? 'before' : 'after';
+        updateVisibility();
+      });
+    } else {
+      const key = groupKey || labelText.replace(/\s+/g, '');
+      subgroupStates[key] = subgroupStates[key] ?? true;
+      checkbox.checked = !!subgroupStates[key];
+      checkbox.addEventListener('change', (e) => {
+        subgroupStates[key] = e.target.checked;
+        updateVisibility();
+      });
+    }
+  
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(labelText));
+    ui.appendChild(label);
+  }
+        
+    
+    // master toggle (looks same as other checkboxes)
+        addGroupToggle(null, 'Show Before State', true);
+        
+        // subgroup toggles that control both before/after groups
+
+        addGroupToggle(beforeMeshes.AllSystems.concat(afterMeshes.AllSystems), 'All Systems', false, 'AllSystems');
+        addGroupToggle(beforeMeshes.Criteria.concat(afterMeshes.Criteria), 'Criteria', false, 'Criteria');
+        addGroupToggle(beforeMeshes.IceCrystal.concat(afterMeshes.IceCrystal), 'Ice Crystals', false, 'IceCrystal');
+        addGroupToggle(beforeMeshes.SilicateCrystal.concat(afterMeshes.SilicateCrystal), 'Silicate Crystals', false, 'SilicateCrystal');
+        addGroupToggle(beforeMeshes.PodTrees.concat(afterMeshes.PodTrees), 'Pod Trees', false, 'PodTrees');
+        addGroupToggle(beforeMeshes.PodSystems.concat(afterMeshes.PodSystems), 'Pod Systems', false, 'PodSystems');
+        
+        // initialize visibility once
+        updateVisibility();
+        
+      const bboxLabel = document.createElement('label');
+      bboxLabel.style.display = 'block';
+      bboxLabel.style.marginTop = '10px';
+      
+      const bboxCheckbox = document.createElement('input');
+      bboxCheckbox.type = 'checkbox';
+      bboxCheckbox.checked = true;
+      bboxCheckbox.style.marginRight = '6px';
+      
+      bboxCheckbox.addEventListener('change', () => {
+        const visible = bboxCheckbox.checked;
+        boxHelper.visible = visible;
+        labelX.visible = visible;
+        labelY.visible = visible;
+        labelZ.visible = visible;
+        console.log('Bounding box and labels visibility set to', visible);
+      });
+      
+      bboxLabel.appendChild(bboxCheckbox);
+      bboxLabel.appendChild(document.createTextNode('Show Bounding Box & Labels'));
+      ui.appendChild(bboxLabel);
+              
+    // Opacity slider for sphere mesh
+    const opacityLabel = document.createElement('label');
+    opacityLabel.style.display = 'block';
+    opacityLabel.style.marginTop = '10px';
+    opacityLabel.textContent = 'Sphere Opacity';
+    
+    const opacitySlider = document.createElement('input');
+    opacitySlider.type = 'range';
+    opacitySlider.min = '0';
+    opacitySlider.max = '1';
+    opacitySlider.step = '0.01';
+    opacitySlider.value = '0.3';
+    
+    opacitySlider.addEventListener('input', () => {
+    const value = parseFloat(opacitySlider.value);
+
+  // think this was a check if the sphere hadn't loaded but probbaly not needed    
+  if (sphereMesh && sphereMesh.material) {
+    const materials = Array.isArray(sphereMesh.material) ? sphereMesh.material : [sphereMesh.material];
+    materials.forEach(mat => {
+      mat.transparent = true;
+      mat.opacity = value;
+      mat.depthWrite = false;
+      mat.needsUpdate = true;
+    });
+      } else {
+        console.warn('Sphere mesh not yet available');
+      }
+    });
+  
+    ui.appendChild(opacityLabel);
+    ui.appendChild(opacitySlider);
+
+function addTitleAndCreditsUI(initialTitle = 'Kepler Ridge Crystal Quest', initialCredits = `Survey Leader: SigmaExplorer
+CMDRs: 
+Kailoren, Arizmulon, Neutron Tide, Shambaloid, MattG, Asentinn, Mooing, RKO Glyph, Precambrian Mollusc
+
+Credits: 
+Data from Spansh, EDGALAXYdata.space
+everyone who contributes data to the feed`) {
+  const metaWrap = document.createElement('div');
+  metaWrap.style.marginTop = '12px';
+  metaWrap.style.paddingTop = '8px';
+  metaWrap.style.borderTop = '1px solid rgba(255,255,255,0.08)';
+  metaWrap.style.fontSize = '13px';
+  metaWrap.id = 'metaWrap';
+
+  const titleLabel = document.createElement('label');
+  titleLabel.style.display = 'block';
+  titleLabel.style.marginBottom = '6px';
+  titleLabel.style.fontWeight = '600';
+  titleLabel.textContent = 'IGAU Survey project';
+  metaWrap.appendChild(titleLabel);
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.value = initialTitle;
+  titleInput.style.width = '220px';
+  titleInput.style.display = 'block';
+  titleInput.style.marginBottom = '10px';
+  titleInput.style.padding = '6px';
+  titleInput.style.background = 'rgba(255,255,255,0.04)';
+  titleInput.style.color = 'white';
+  titleInput.style.border = '1px solid rgba(255,255,255,0.08)';
+  titleInput.style.borderRadius = '3px';
+  titleInput.id = 'vizTitleInput';
+  metaWrap.appendChild(titleInput);
+
+  const creditsLabel = document.createElement('label');
+  creditsLabel.style.display = 'block';
+  creditsLabel.style.marginBottom = '6px';
+  creditsLabel.style.fontWeight = '600';
+  creditsLabel.textContent = 'Credits and Data Contributors';
+  metaWrap.appendChild(creditsLabel);
+
+  const creditsArea = document.createElement('textarea');
+  creditsArea.value = initialCredits;
+  creditsArea.rows = 15;
+  creditsArea.style.width = '220px';
+  creditsArea.style.padding = '6px';
+  creditsArea.style.background = 'rgba(255,255,255,0.04)';
+  creditsArea.style.color = 'white';
+  creditsArea.style.border = '1px solid rgba(255,255,255,0.08)';
+  creditsArea.style.borderRadius = '3px';
+  creditsArea.style.resize = 'vertical';
+  creditsArea.id = 'vizCreditsArea';
+  metaWrap.appendChild(creditsArea);
+
+  const btn = document.createElement('button');
+  btn.textContent = 'Hide Info';
+  btn.style.display = 'block';
+  btn.style.marginTop = '8px';
+  btn.style.padding = '6px 8px';
+  btn.style.background = 'rgba(255,255,255,0.06)';
+  btn.style.color = 'white';
+  btn.style.border = '1px solid rgba(255,255,255,0.12)';
+  btn.style.borderRadius = '3px';
+  btn.id = 'metaToggleBtn';
+  metaWrap.appendChild(btn);
+
+  const preview = document.createElement('div');
+  preview.style.marginTop = '8px';
+  preview.style.fontSize = '14px';
+  preview.style.fontWeight = '600';
+  preview.style.display = 'none';
+  preview.style.whiteSpace = 'pre-wrap';
+  preview.id = 'metaPreview';
+  metaWrap.appendChild(preview);
+
+  ui.appendChild(metaWrap);
+
+  function updatePreview() {
+    const title = titleInput.value.trim() || 'Untitled Visualization';
+    const credits = creditsArea.value.trim();
+    preview.textContent = `${title}\n\n${credits}`;
+  }
+
+  btn.addEventListener('click', () => {
+    const hidden = titleInput.style.display === 'none';
+    if (hidden) {
+      titleInput.style.display = 'block';
+      creditsArea.style.display = 'block';
+      preview.style.display = 'none';
+      btn.textContent = 'Hide Info';
+    } else {
+      titleInput.style.display = 'none';
+      creditsArea.style.display = 'none';
+      preview.style.display = 'block';
+      btn.textContent = 'Show Info';
+      updatePreview();
+    }
+  });
+
+  titleInput.addEventListener('input', updatePreview);
+  creditsArea.addEventListener('input', updatePreview);
+  updatePreview();
+
+  return { metaWrap, titleInput, creditsArea, btn, preview };
+}
+
+// Usage (call after ui exists, e.g., inside buildUIAndInit)
+const metaControls = addTitleAndCreditsUI();
+
+    
+}); // ← closes loader.load
+
+    
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+    //labelX.lookAt(camera.position);
+    //labelY.lookAt(camera.position);
+    //labelZ.lookAt(camera.position);
+  }
+  animate();
+  
+  
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+</script>
+</body>
+</html>
