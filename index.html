@@ -268,7 +268,52 @@
     thargoid.material.depthWrite = false; // prevents z-fighting
     thargoid.material.blending = THREE.AdditiveBlending;
     thargoid.material.needsUpdate = true;
-   
+
+        const labels = {
+      "NGC 133": [-397.0, -954.0, -382.0],
+      "Orion Dark": [603.0, -1337, -312],
+      "LBN 623 Nebula": [-499, -332, -16],
+      "Witch Head Nebula": [359, -718, -385],
+      "Veil East Nebula": [-1920, 486, -307],
+      "Coal Sack Nebula": [501, 212, 43],
+      "Lagoon Nebula": [-486, 4474,-92]     
+    };
+    
+    const nebulaMaterial = new THREE.MeshPhongMaterial({
+      color: 0x9966ff,           // Ethereal violet
+      transparent: true,
+      opacity: 0.3,
+      shininess: 80,
+      emissive: 0x330066,
+      emissiveIntensity: 0.5,
+    });
+    
+    const labelStyle = {
+      fontSize: 24,
+      color: '#ffffff',
+      backgroundColor: 'transparent',
+    };
+    
+    Object.entries(labels).forEach(([name, pos]) => {
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(40, 32, 32),
+        nebulaMaterial.clone()
+      );
+      sphere.position.set(...pos);
+      scene.add(sphere);
+    
+      // Optional: Add label using CSS2DRenderer
+      const div = document.createElement('div');
+      div.className = 'label';
+      div.textContent = name;
+      Object.assign(div.style, labelStyle);
+    
+      const label = new THREE.CSS2DObject(div);
+      label.position.set(...pos);
+      scene.add(label);
+    });
+
+    
   // add the bounding box 
           const box = new THREE.Box3().setFromObject(model);
           const size = box.getSize(new THREE.Vector3());
@@ -297,7 +342,7 @@
     
           scene.add(labelX, labelY, labelZ);
           
-          const arrowLength = size.length() * 0.2;
+          const arrowLength = size.length() * 0.02;
           const arrowX = new THREE.ArrowHelper(
             new THREE.Vector3(1, 0, 0), // direction: +X
             box.min,                    // origin: bounding box corner
@@ -402,7 +447,7 @@
       const focusPoint = new THREE.Vector3(0, 0, 0); // Change to any desired coordinates
       
       // Set camera position
-      camera.position.set(-3000, 3000, -2000); // Adjust as needed
+      camera.position.set(-2000, 2000, -1500); // Adjust as needed
       
         // Force camera to look at the focus point
       camera.lookAt(focusPoint);
@@ -413,7 +458,7 @@
       
       // Optional: Visual marker for debugging
       const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(0.2),
+        new THREE.SphereGeometry(5),
         new THREE.MeshBasicMaterial({ color: 0xff0000 })
       );
       marker.position.copy(focusPoint);
