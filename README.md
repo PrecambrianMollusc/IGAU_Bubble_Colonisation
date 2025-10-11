@@ -1,5 +1,5 @@
-This is an interactive plot of the survey of the Crystal Tree NSP locations on the Kepler Ridge. 
-This survey was carried out mid 2025  
+This is an interactive plot of the bubble expansion colonisation for Elite Dangerous 
+
 The initial visualisation is carried out locally using code not in this repository yet. 
 The code uses python and pyvista to do data extraction and 3d renderings. The pyvista setof objects is saved as a gtlf file. 
 This is called visualizations.gtlf and is uploaded 
@@ -14,11 +14,5 @@ Note I did name the meshes in the python pyvista code with the intent to use tho
 I'll add some annotaions to explain what each one is if I can't get the name to export properly
 
 Other work to do 
-1) Add credits / title for IGAU spansh ,etc 
-2) clean up axis labels and add coordinate ticks
-3) clean up code for flow readbility - do i put lights cameras axis etc at the beginning or the end?
-4) Add carrier locations if teh cmdrs will let me know where they were
-5) Matt _G sphere and center point is good for showing the radius from a point 
-6) Could add the convex hull visulisation but not needed probably ?
-7) Animation of the survey over time - two pathes - do in pyvistasas movie of frame png files, or create seeveral gtml files at say weekly intervales and use a slider or something to alow user to step through
-8) On animation simple one woudl be to do 'start' and 'ending' meshes . Should be easily doable from pyvista and have as start and incremenet layers  
+1) Add credits / title for IGAU spansh edgalaxydata,etc 
+2) many many things 
