@@ -349,11 +349,11 @@ Object.entries(labels).forEach(([name, pos]) => {
           const max = box.max;
           const offset = size.length() * 0.1;
 
-          const labelX = createAxisLabelMesh('Galactic X', new THREE.Vector3(min.x + offset, min.y, min.z), new THREE.Euler(0, 0, 0));
+          const labelX = createAxisLabelMesh('Galactic Z', new THREE.Vector3(min.x + offset, min.y, min.z), new THREE.Euler(0, 0, 0));
           const labelY = createAxisLabelMesh('Galactic Y', new THREE.Vector3(min.x, min.y + offset, min.z), new THREE.Euler(0, 0, Math.PI / 2));
-          const labelZ = createAxisLabelMesh('Galactic Z', new THREE.Vector3(min.x, min.y, min.z + offset), new THREE.Euler( 0,  - Math.PI / 2, 0));        
+          const labelZ = createAxisLabelMesh('Galactic X', new THREE.Vector3(min.x, min.y, min.z + offset), new THREE.Euler( 0,  - Math.PI / 2, 0));        
               
-          const labelScale = size.length() * 0.0002; // 20% of diagonal length
+          const labelScale = size.length() * 0.0004; // 20% of diagonal length
           labelX.scale.set(labelScale, labelScale * 0.5, 1);
           labelY.scale.set(labelScale, labelScale * 0.5, 1);
           labelZ.scale.set(labelScale, labelScale * 0.5, 1);
