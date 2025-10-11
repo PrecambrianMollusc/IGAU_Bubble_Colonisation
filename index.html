@@ -270,13 +270,13 @@
     thargoid.material.needsUpdate = true;
 
         const labels = {
-      "NGC 133": [-397.0, -382.0, -954.0],
+      "NGC 133": [-397.0, -382.0,-954.0 ],
       "Orion Dark": [603.0, -312, -1337],
       "LBN 623 Nebula": [-499, -16, -332],
       "Witch Head Nebula": [359, -385, -718],
       "Veil East Nebula": [-1920, -307, 486],
       "Coal Sack Nebula": [501, 43, 212],
-      "Lagoon Nebula": [-486,-92, 4474]     
+      "Lagoon Nebula": [ 4474,-92,-486]     
     };
     
     const nebulaMaterial = new THREE.MeshPhongMaterial({
@@ -353,10 +353,10 @@ Object.entries(labels).forEach(([name, pos]) => {
           const labelY = createAxisLabelMesh('Galactic Y', new THREE.Vector3(min.x, min.y + offset, min.z), new THREE.Euler(0, 0, Math.PI / 2));
           const labelZ = createAxisLabelMesh('Galactic Z', new THREE.Vector3(min.x, min.y, min.z + offset), new THREE.Euler( 0,  - Math.PI / 2, 0));        
               
-          const labelScale = size.length() * 0.002; // 20% of diagonal length
-          labelX.scale.set(labelScale, labelScale * 0.1, 1);
-          labelY.scale.set(labelScale, labelScale * 0.1, 1);
-          labelZ.scale.set(labelScale, labelScale * 0.1, 1);
+          const labelScale = size.length() * 0.0002; // 20% of diagonal length
+          labelX.scale.set(labelScale, labelScale * 0.5, 1);
+          labelY.scale.set(labelScale, labelScale * 0.5, 1);
+          labelZ.scale.set(labelScale, labelScale * 0.5, 1);
     
           scene.add(labelX, labelY, labelZ);
           
