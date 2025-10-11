@@ -400,6 +400,10 @@
 
     // Set focus point — where the camera looks
       const focusPoint = new THREE.Vector3(0, 0, 0);
+
+    // Set camera position (x, y, z)
+    camera.position.set(-3000, 3000, 200);
+
       camera.lookAt(focusPoint);
       console.log("📍 Camera Position:", camera.position);
       console.log("🎯 Focus Point:", focusPoint);
