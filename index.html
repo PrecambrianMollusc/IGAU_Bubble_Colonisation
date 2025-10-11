@@ -148,7 +148,7 @@
         if (child.name === 'mesh5' ) after_empire = child;
         if (child.name === 'mesh6' ) before_fed = child;
         if (child.name === 'mesh7' ) after_fed = child;
-        if (child.name === 'mesh8' || child.name === 'mesh9') {guardian.push(child);}
+        if (child.name === 'mesh8' ) guardian = child;
         if (child.name === 'mesh10') thargoid = child;
         
         console.log(`Mesh ${meshList.length - 1}:`, child.name || '(unnamed)', child);
