@@ -398,15 +398,25 @@
       bboxLabel.appendChild(document.createTextNode('Show Bounding Box & Labels'));
       ui.appendChild(bboxLabel);
 
-    // Set focus point — where the camera looks
-      const focusPoint = new THREE.Vector3(0, 0, 0);
-
-    // Set camera position (x, y, z)
-    camera.position.set(-3000, 3000, 200);
-
+        // Force camera to look at the focus point
       camera.lookAt(focusPoint);
-      console.log("📍 Camera Position:", camera.position);
-      console.log("🎯 Focus Point:", focusPoint);
+      
+      // Override OrbitControls target
+      controls.target.copy(focusPoint);
+      controls.update();
+      
+      // Optional: Visual marker for debugging
+      const marker = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2),
+        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+      );
+      marker.position.copy(focusPoint);
+      scene.add(marker);
+      
+      // Log for diagnostics
+      console.log("📍 Camera Position:", camera.position.clone());
+      console.log("🎯 Focus Point:", focusPoint.clone());
+      console.log("🕹️ OrbitControls Target:", controls.target.clone());
 
 
 function addTitleAndCreditsUI(initialTitle = 'Colonisation Progress', initialCredits = `Survey Leader: N/A
