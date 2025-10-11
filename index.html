@@ -181,7 +181,7 @@
 
     // point cloud for before imdependent - should be a low opacity blur
     before_ind.material.map = sprite_sphere;
-    before_ind.material.size = 2.0; // make points larger
+    before_ind.material.size = 4.0; // make points larger
     before_ind.material.opacity = 0.5;
     before_ind.material.transparent = true;
     before_ind.material.depthWrite = false; // prevents z-fighting
@@ -190,7 +190,7 @@
 
     // point cloud for after independent - should be a low opacity blur
     after_ind.material.map = sprite_sphere;
-    after_ind.material.size = 4.0; // make points larger
+    after_ind.material.size = 5.0; // make points larger
     after_ind.material.opacity = 0.5;
     after_ind.material.transparent = true;
     after_ind.material.depthWrite = false; // prevents z-fighting
@@ -199,7 +199,7 @@
 
     // point cloud for all before alliance- should be a low opacity blur
     before_alliance.material.map = sprite_sphere;
-    before_alliance.material.size = 4.0; // make points larger
+    before_alliance.material.size = 5.0; // make points larger
     before_alliance.material.opacity = 0.5;
     before_alliance.material.transparent = true;
     before_alliance.material.depthWrite = false; // prevents z-fighting
@@ -208,7 +208,7 @@
 
     // point cloud for all after alliance - should be a low opacity blur
     after_alliance.material.map = sprite_sphere;
-    after_alliance.material.size = 4.0; // make points larger
+    after_alliance.material.size = 5.0; // make points larger
     after_alliance.material.opacity = 0.5;
     after_alliance.material.transparent = true;
     after_alliance.material.depthWrite = false; // prevents z-fighting
@@ -217,7 +217,7 @@
 
     // point cloud for all before empire- should be a low opacity blur
     before_empire.material.map = sprite_sphere;
-    before_empire.material.size = 4.0; // make points larger
+    before_empire.material.size = 5.0; // make points larger
     before_empire.material.opacity = 0.5;
     before_empire.material.transparent = true;
     before_empire.material.depthWrite = false; // prevents z-fighting
@@ -226,8 +226,8 @@
 
     // point cloud for all before systems - should be a low opacity blur
     after_empire.material.map = sprite_sphere;
-    after_empire.material.size = 4.5; // make points larger
-    after_empire.material.opacity = 0.3;
+    after_empire.material.size = 5.0; // make points larger
+    after_empire.material.opacity = 0.5;
     after_empire.material.transparent = true;
     after_empire.material.depthWrite = false; // prevents z-fighting
     after_empire.material.blending = THREE.AdditiveBlending;
@@ -235,7 +235,7 @@
     
     // point cloud for all before federation- should be a low opacity blur
     before_fed.material.map = sprite_sphere;
-    before_fed.material.size = 4.0; // make points larger
+    before_fed.material.size = 5.0; // make points larger
     before_fed.material.opacity = 0.5;
     before_fed.material.transparent = true;
     before_fed.material.depthWrite = false; // prevents z-fighting
@@ -244,14 +244,14 @@
 
     // point cloud for all before systems - should be a low opacity blur
     after_fed.material.map = sprite_sphere;
-    after_fed.material.size = 4.0; // make points larger
+    after_fed.material.size = 5.0; // make points larger
     after_fed.material.opacity = 0.5;
     after_fed.material.transparent = true;
     after_fed.material.depthWrite = false; // prevents z-fighting
     after_fed.material.blending = THREE.AdditiveBlending;
     after_fed.material.needsUpdate = true;
 
-    // point cloud for all before federation- should be a low opacity blur
+    // point cloud for all giuardian- should be a low opacity blur
     guardian.material.map = sprite_sphere;
     guardian.material.size = 8.0; // make points larger
     guardian.material.opacity = 0.4;
@@ -260,7 +260,7 @@
     guardian.material.blending = THREE.AdditiveBlending;
     guardian.material.needsUpdate = true;
 
-    // point cloud for all before systems - should be a low opacity blur
+    // point cloud for all thargoid - should be a low opacity blur
     thargoid.material.map = sprite_sphere;
     thargoid.material.size = 8.0; // make points larger
     thargoid.material.opacity = 0.4;
@@ -290,17 +290,25 @@
     
 const createTextSprite = (text) => {
   const canvas = document.createElement('canvas');
+  canvas.width = 512;  // Wider canvas for longer labels
+  canvas.height = 128;
+
   const context = canvas.getContext('2d');
   context.font = 'Bold 48px Arial';
   context.fillStyle = 'rgba(255,255,255,0.8)';
-  context.fillText(text, 0, 50);
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(text, canvas.width / 2, canvas.height / 2);
 
   const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(100, 50, 1); // Adjust size as needed
+  sprite.scale.set(150, 50, 1); // Wider scale to match canvas
   return sprite;
 };
+
 
 Object.entries(labels).forEach(([name, pos]) => {
   // Ethereal sphere
