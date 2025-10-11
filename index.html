@@ -368,14 +368,12 @@
         
         // subgroup toggles that control both before/after groups
 
-        addGroupToggle(beforeMeshes.ind.concat(afterMeshes.ind), 'All Systems', false, 'AllSystems');
-        addGroupToggle(beforeMeshes.Criteria.concat(afterMeshes.Criteria), 'Criteria', false, 'Criteria');
-        addGroupToggle(beforeMeshes.IceCrystal.concat(afterMeshes.IceCrystal), 'Ice Crystals', false, 'IceCrystal');
-        addGroupToggle(beforeMeshes.SilicateCrystal.concat(afterMeshes.SilicateCrystal), 'Silicate Crystals', false, 'SilicateCrystal');
-        addGroupToggle(beforeMeshes.PodTrees.concat(afterMeshes.PodTrees), 'Pod Trees', false, 'PodTrees');
-        addGroupToggle(beforeMeshes.PodSystems.concat(afterMeshes.PodSystems), 'Pod Systems', false, 'PodSystems');
+        addGroupToggle(beforeMeshes.Independent.concat(afterMeshes.Independent), 'Independent', false, 'Independent');
+        addGroupToggle(beforeMeshes.Alliance.concat(afterMeshes.Alliance), 'Alliance', false, 'Alliance');
+        addGroupToggle(beforeMeshes.Empire.concat(afterMeshes.Empire), 'Empire', false, 'Empire');
+        addGroupToggle(beforeMeshes.Federation.concat(afterMeshes.Federation), 'Federation', false, 'Federation');
         
-        // initialize visibility once
+      // initialize visibility once
         updateVisibility();
         
       const bboxLabel = document.createElement('label');
@@ -401,9 +399,9 @@
       ui.appendChild(bboxLabel);
 
 
-function addTitleAndCreditsUI(initialTitle = 'Kepler Ridge Crystal Quest', initialCredits = `Survey Leader: SigmaExplorer
+function addTitleAndCreditsUI(initialTitle = 'Colonisation Porgress', initialCredits = `Survey Leader: N/A
 CMDRs: 
-Kailoren, Arizmulon, Neutron Tide, Shambaloid, MattG, Asentinn, Mooing, RKO Glyph, Precambrian Mollusc
+many many many
 
 Credits: 
 Data from Spansh, EDGALAXYdata.space
