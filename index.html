@@ -102,7 +102,9 @@
       Alliance: true,
       Empire: true,
       Federation: true,
-  };  
+      IGAU: true,
+      Mikunn: true,
+      };  
   
   let activeState = 'before'; // default
 
@@ -118,6 +120,11 @@
   let after_fed = [];
   let guardian = [];
   let thargoid = [];
+  let before_IGAU = [];
+  let after_IGAU = [];
+  let before_mikunn = [];
+  let after_mikunn = [];
+  
     
   // load the gtlf file 
   const loader = new GLTFLoader();
@@ -150,6 +157,10 @@
         if (child.name === 'mesh7' ) after_fed = child;
         if (child.name === 'mesh8' ) guardian = child;
         if (child.name === 'mesh10') thargoid = child;
+        if (child.name === 'mesh11') before_IGAU = child;
+        if (child.name === 'mesh12') before_mikunn = child;
+        if (child.name === 'mesh13') after_IGAU = child;
+        if (child.name === 'mesh14') after_mikunn = child;
         
         console.log(`Mesh ${meshList.length - 1}:`, child.name || '(unnamed)', child);
       }
@@ -163,7 +174,9 @@
       Independent: [before_ind],
       Alliance: [before_alliance],
       Empire: [before_empire],
-      Federation:[before_fed]
+      Federation:[before_fed],
+      IGAU:[before_igau],
+      Mikunn:[before_mikunn]
       };
     
     // AFTER meshes
@@ -172,7 +185,10 @@
       Alliance: [after_alliance],
       Empire: [after_empire],
       Federation:[after_fed]
-      };
+      IGAU:[after_igau],
+      Mikunn:[after_mikunn]
+        
+    };
 
     // point cloud set up to make small spheres
     const sprite_sphere = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
@@ -215,7 +231,7 @@
     after_alliance.material.blending = THREE.AdditiveBlending;
     after_alliance.material.needsUpdate = true;
 
-    // point cloud for all before empire- should be a low opacity blur
+    // point cloud for  empire before- should be a low opacity blur
     before_empire.material.map = sprite_sphere;
     before_empire.material.size = 5.0; // make points larger
     before_empire.material.opacity = 0.5;
@@ -224,7 +240,7 @@
     before_empire.material.blending = THREE.AdditiveBlending;
     before_empire.material.needsUpdate = true;
 
-    // point cloud for all before systems - should be a low opacity blur
+    // point cloud for empire after systems - should be a low opacity blur
     after_empire.material.map = sprite_sphere;
     after_empire.material.size = 5.0; // make points larger
     after_empire.material.opacity = 0.5;
@@ -233,7 +249,7 @@
     after_empire.material.blending = THREE.AdditiveBlending;
     after_empire.material.needsUpdate = true;
     
-    // point cloud for all before federation- should be a low opacity blur
+    // point cloud for fed before - should be a low opacity blur
     before_fed.material.map = sprite_sphere;
     before_fed.material.size = 5.0; // make points larger
     before_fed.material.opacity = 0.5;
@@ -242,7 +258,7 @@
     before_fed.material.blending = THREE.AdditiveBlending;
     before_fed.material.needsUpdate = true;
 
-    // point cloud for all before systems - should be a low opacity blur
+    // point cloud for fed after systems - should be a low opacity blur
     after_fed.material.map = sprite_sphere;
     after_fed.material.size = 5.0; // make points larger
     after_fed.material.opacity = 0.5;
@@ -251,7 +267,7 @@
     after_fed.material.blending = THREE.AdditiveBlending;
     after_fed.material.needsUpdate = true;
 
-    // point cloud for all giuardian- should be a low opacity blur
+    // point cloud for all guardian- should be a low opacity blur
     guardian.material.map = sprite_sphere;
     guardian.material.size = 8.0; // make points larger
     guardian.material.opacity = 0.4;
@@ -269,7 +285,43 @@
     thargoid.material.blending = THREE.AdditiveBlending;
     thargoid.material.needsUpdate = true;
 
-        const labels = {
+    // point cloud for IGAU before - should be a low opacity blur
+    before_IGAU.material.map = sprite_sphere;
+    before_IGAU.material.size = 8.0; // make points larger
+    before_IGAU.material.opacity = 0.8;
+    before_fed.material.transparent = true;
+    before_IGAU.material.depthWrite = false; // prevents z-fighting
+    before_IGAU.material.blending = THREE.AdditiveBlending;
+    before_IGAU.material.needsUpdate = true;
+
+    // point cloud for IGAU after systems - should be a low opacity blur
+    after_IGAU.material.map = sprite_sphere;
+    after_IGAU.material.size = 8.0; // make points larger
+    after_IGAU.material.opacity = 0.8;
+    after_IGAU.material.transparent = true;
+    after_IGAU.material.depthWrite = false; // prevents z-fighting
+    after_IGAU.material.blending = THREE.AdditiveBlending;
+    after_IGAU.material.needsUpdate = true;
+
+    // point cloud for mikunn before - should be a low opacity blur
+    before_mikunn.material.map = sprite_sphere;
+    before_mikunn.material.size = 8.0; // make points larger
+    before_mikunn.material.opacity = 0.8;
+    before_mikunn.material.transparent = true;
+    before_mikunn.material.depthWrite = false; // prevents z-fighting
+    before_mikunn.material.blending = THREE.AdditiveBlending;
+    before_mikunn.material.needsUpdate = true;
+
+    // point cloud for mikunn after systems - should be a low opacity blur
+    after_mikunn.material.map = sprite_sphere;
+    after_mikunn.material.size = 8.0; // make points larger
+    after_mikunn.material.opacity = 0.8;
+    after_mikunn.material.transparent = true;
+    after_mikunn.material.depthWrite = false; // prevents z-fighting
+    after_mikunn.material.blending = THREE.AdditiveBlending;
+    after_mikunn.material.needsUpdate = true;
+  
+         const labels = {
       "NGC 133": [-954.0 ,-382.0, -397.0],
       "Orion Dark": [-1337, -312,603.0],
       "LBN 623 Nebula": [-332, -16,-499],
@@ -435,7 +487,9 @@ Object.entries(labels).forEach(([name, pos]) => {
         addGroupToggle(beforeMeshes.Alliance.concat(afterMeshes.Alliance), 'Alliance', false, 'Alliance');
         addGroupToggle(beforeMeshes.Empire.concat(afterMeshes.Empire), 'Empire', false, 'Empire');
         addGroupToggle(beforeMeshes.Federation.concat(afterMeshes.Federation), 'Federation', false, 'Federation');
-        
+        addGroupToggle(beforeMeshes.IGAU.concat(afterMeshes.Federation), 'IGAU', false, 'IGAU');
+        addGroupToggle(beforeMeshes.mikunn.concat(afterMeshes.mikunn), 'Mikunn', false, 'Mikunn');
+  
       // initialize visibility once
         updateVisibility();
         
@@ -460,7 +514,32 @@ Object.entries(labels).forEach(([name, pos]) => {
       bboxLabel.appendChild(bboxCheckbox);
       bboxLabel.appendChild(document.createTextNode('Show Bounding Box & Labels'));
       ui.appendChild(bboxLabel);
-      
+  
+      // set up some legends 
+      const createLegendLabel = (text, color, position) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.font = 'Bold 48px Arial';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(150, 50, 1);
+      sprite.position.copy(position);
+      scene.add(sprite);
+      };
+    
+    // Example usage
+    //createLegendLabel("Independent", "#ffcc00", new THREE.Vector3(0, 300, 0));
+    //createLegendLabel("IGAU Nebulas", "#9966ff", new THREE.Vector3(0, 250, 0));
+
+
     // Define your manual focus point
       const focusPoint = new THREE.Vector3(0, 0, 0); // Change to any desired coordinates
       
@@ -497,7 +576,9 @@ Green blobby - Thargoid
 Yellow - Independent 
 Green - Alliance
 Blue - Empire
-Red - Federation 
+Red - Federation
+Orange - IGAU
+Magenta - Mikunn
 Credits: 
 Data from Spansh, EDGALAXYdata.space
 everyone who contributes data to the feeds`) {
