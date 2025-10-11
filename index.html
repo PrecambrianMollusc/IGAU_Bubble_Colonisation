@@ -311,6 +311,7 @@
     after_IGAU.material.emissiveIntensity = 0.5;
     after_IGAU.material.needsUpdate = true;
 
+    before_mikunn.material = before_mikunn.material.clone();
     // point cloud for mikunn before - should be a low opacity blur
     before_mikunn.material.map = sprite_sphere;
     before_mikunn.material.size = 6.0; // make points larger
@@ -324,6 +325,7 @@
     before_mikunn.material.emissiveIntensity = 0.4;
     before_mikunn.material.needsUpdate = true;
 
+    after_mikunn.material = before_mikunn.material.clone();
     // point cloud for mikunn after systems - should be a low opacity blur
     after_mikunn.material.map = sprite_sphere;
     after_mikunn.material.size = 6.0; // make points larger
