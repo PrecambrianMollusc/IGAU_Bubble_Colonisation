@@ -252,22 +252,22 @@
     after_fed.material.needsUpdate = true;
 
     // point cloud for all before federation- should be a low opacity blur
-    before_guardian.material.map = sprite_sphere;
-    before_guardian.material.size = 5.0; // make points larger
-    before_guardian.material.opacity = 0.3;
-    before_guardian.material.transparent = true;
-    before_guardian.material.depthWrite = false; // prevents z-fighting
-    before_guardian.material.blending = THREE.AdditiveBlending;
-    before_guardian.material.needsUpdate = true;
+    guardian.material.map = sprite_sphere;
+    guardian.material.size = 5.0; // make points larger
+    guardian.material.opacity = 0.3;
+    guardian.material.transparent = true;
+    guardian.material.depthWrite = false; // prevents z-fighting
+    guardian.material.blending = THREE.AdditiveBlending;
+    guardian.material.needsUpdate = true;
 
     // point cloud for all before systems - should be a low opacity blur
-    after_thargoid.material.map = sprite_sphere;
-    after_thargoid.material.size = 5.0; // make points larger
-    after_thargoid.material.opacity = 0.3;
-    after_thargoid.material.transparent = true;
-    after_thargoid.material.depthWrite = false; // prevents z-fighting
-    after_thargoid.material.blending = THREE.AdditiveBlending;
-    after_thargoid.material.needsUpdate = true;
+    thargoid.material.map = sprite_sphere;
+    thargoid.material.size = 5.0; // make points larger
+    thargoid.material.opacity = 0.3;
+    thargoid.material.transparent = true;
+    thargoid.material.depthWrite = false; // prevents z-fighting
+    thargoid.material.blending = THREE.AdditiveBlending;
+    thargoid.material.needsUpdate = true;
    
   // add the bounding box 
           const box = new THREE.Box3().setFromObject(model);
