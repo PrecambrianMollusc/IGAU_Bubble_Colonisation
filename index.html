@@ -21,9 +21,9 @@
   const loader = new GLTFLoader();
   const dracoLoader = new DRACOLoader();
   // Point this to the Draco decoder files (downloaded from three.js repo)
-  //dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/'); 
+  dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/'); 
   // or a local path like './draco/' if you host the decoder files yourself
-  dracoLoader.setDecoderPath('./draco/'); 
+  //dracoLoader.setDecoderPath('./draco/'); 
   
   loader.setDRACOLoader(dracoLoader);
   // renderer , camera, scene, controls
@@ -125,7 +125,7 @@ allegianceFiles.forEach(({ name, url}) => {
 
       loadedCount++;
       if (loadedCount === allegianceFiles.length) {
-        setupGUI(); // only once *all* are loaded
+        initGUIs(); // only once *all* are loaded
       }
     },
     undefined,
@@ -133,32 +133,268 @@ allegianceFiles.forEach(({ name, url}) => {
   );
 });
 
+// load star cloud 
+let starCloud = null;
+let starCloudController; // reference to the GUI button
 
-// add the galaxy G stars
-const scale = 45000 / 32000; // same as Python
-const center_gal = new THREE.Vector3(15918, -91, -1299); // from Python
-  
-loader.load('./star_cloud.glb', gltf => {
-  const cloud = gltf.scene;
- console.log('GLTF loaded-: ', cloud);
+function toggleStarCloud() {
+  if (!starCloud) {
+    // First time: load and keep reference
+    loader.load('./star_cloud.glb', (gltf) => {
+      starCloud = gltf.scene;
 
-  cloud.traverse(obj => {
-    if (obj.isPoints) {
-      const mat = obj.material;
-      mat.color.set(0xffa500);       // orange
-      mat.transparent = true;
-      sizeAttenuation: true,
-      mat.opacity = 0.03;              // low opacity
-      mat.size = 0.15;                 // small point size
-      mat.depthWrite = false;        // optional: improves blending
-      
-      mat.needsUpdate = true;
+      starCloud.traverse((obj) => {
+        if (obj.isPoints) {
+          const mat = obj.material;
+          mat.color.set(0xffa500);
+          mat.transparent = true;
+          mat.opacity = 0.03;
+          mat.size = 0.15;
+          mat.depthWrite = false;
+          mat.needsUpdate = true;
+        }
+      });
+
+      scene.add(starCloud);
+      starCloud.visible = true;
+
+      // Update button label
+      if (starCloudController) {
+        starCloudController.name('Hide Star Cloud');
+      }
+
+      console.log('Star cloud loaded and visible');
+    });
+  } else {
+    // Already loaded: just toggle visibility
+    starCloud.visible = !starCloud.visible;
+
+    // Update button label
+    if (starCloudController) {
+      starCloudController.name(starCloud.visible ? 'Hide Star Cloud' : 'Show Star Cloud');
     }
-  });
- 
-  scene.add(cloud);
-});
 
+    console.log(`Star cloud ${starCloud.visible ? 'shown' : 'hidden'}`);
+  }
+}
+
+let galacticPlane = null;
+let galacticPlaneController;
+const galacticPlaneState = {
+  opacity: 0.3,
+  y: -5000
+};
+
+function toggleGalacticPlane() {
+  if (!galacticPlane) {
+    // First time: create and add the plane
+    const width = 90000;
+    const height = 90000;
+
+    const groundGeometry = new THREE.PlaneGeometry(width, height, 1, 1);
+    const textureLoader = new THREE.TextureLoader();
+    const groundTexture = textureLoader.load(
+      'https://precambrianmollusc.github.io/Galaxy_He_levels/gamegalaxy-4500px.png'
+    );
+
+    const groundMaterial = new THREE.MeshBasicMaterial({
+      map: groundTexture,
+      transparent: true,
+      opacity: galacticPlaneState.opacity,
+      side: THREE.DoubleSide
+    });
+
+    galacticPlane = new THREE.Mesh(groundGeometry, groundMaterial);
+    galacticPlane.rotation.x = -Math.PI / 2;
+    galacticPlane.rotation.z = -Math.PI / 2;
+    galacticPlane.position.set(25000, galacticPlaneState.y, 0);
+
+    scene.add(galacticPlane);
+
+    if (galacticPlaneController) {
+      galacticPlaneController.name('Hide Galactic Plane');
+    }
+
+    console.log('Galactic plane loaded and visible');
+  } else {
+    // Already created: toggle visibility
+    galacticPlane.visible = !galacticPlane.visible;
+
+    if (galacticPlaneController) {
+      galacticPlaneController.name(
+        galacticPlane.visible ? 'Hide Galactic Plane' : 'Show Galactic Plane'
+      );
+    }
+
+    console.log(`Galactic plane ${galacticPlane.visible ? 'shown' : 'hidden'}`);
+  }
+}
+
+/// funcions for adding the Helium concentrations 
+let guardianGroup = null;
+let guardianController;
+let heliumGroup = null;
+let heliumController;
+const heliumState = {
+  opacity: 0.5,
+  intensity: 1.0
+};
+
+let guardianMeshes = [];
+let guardian_ruins = [];
+let guardian_structures = [];
+let guardian_beacons = [];
+let hen_neb = [];
+let guardian_connector = [];
+
+function toggleHeliumCloud() {
+  if (!heliumGroup) {
+    // Load and process the GLB
+     loader.load('./galaxyscience/helium_levels.glb', (gltf) => {
+      const model = gltf.scene;
+
+
+      const meshList = [];
+      const He_mass_code_0 = [], He_mass_code_1 = [], He_mass_code_2 = [],
+            He_mass_code_3 = [], He_mass_code_4 = [], He_mass_code_5 = [],
+            He_mass_code_6 = [] ;
+     
+      let sphereMesh = null;
+
+      model.traverse((child) => {
+        if (child.isMesh || child.type === 'Points') {
+          meshList.push(child);
+
+          switch (child.name) {
+            case 'mesh0': He_mass_code_0.push(child); break;
+            case 'mesh1': He_mass_code_1.push(child); break;
+            case 'mesh2': He_mass_code_2.push(child); break;
+            case 'mesh3': He_mass_code_3.push(child); break;
+            case 'mesh4': He_mass_code_4.push(child); break;
+            case 'mesh5': He_mass_code_5.push(child); break;
+            case 'mesh6': He_mass_code_6.push(child); break;
+            case 'mesh7': guardian_ruins.push(child); break;
+            case 'mesh8': guardian_structures.push(child); break;
+            case 'mesh9': guardian_beacons.push(child); break;
+            case 'mesh10': hen_neb.push(child); break;
+            case 'mesh11': guardian_connector.push(child); break;
+          }
+
+       
+          console.log(`Mesh ${meshList.length - 1}:`, child.name || '(unnamed)');
+        }
+    
+
+      });
+
+      // Group He_mass_code_X meshes
+      heliumGroup = new THREE.Group();
+      heliumGroup.name = 'He_mass_group';
+
+      [
+        He_mass_code_0, He_mass_code_1, He_mass_code_2,
+        He_mass_code_3, He_mass_code_4, He_mass_code_5,
+        He_mass_code_6
+      ].forEach(arr => {
+        arr.forEach(mesh => heliumGroup.add(mesh));
+      });
+
+      // Cache original vertex colors
+      heliumGroup.traverse(obj => {
+        if (obj.isMesh && obj.geometry && obj.geometry.attributes.color) {
+          const colors = obj.geometry.attributes.color;
+          const orig = new Float32Array(colors.count * 3);
+          for (let i = 0; i < colors.count; i++) {
+            orig[i*3]   = colors.getX(i);
+            orig[i*3+1] = colors.getY(i);
+            orig[i*3+2] = colors.getZ(i);
+          }
+          obj.userData.originalColors = orig;
+        }
+
+        // Apply initial opacity
+        if (obj.material) {
+          obj.material.transparent = true;
+          obj.material.opacity = heliumState.opacity;
+          obj.material.blending = THREE.AdditiveBlending;
+          obj.material.depthWrite = false;   // 👈 add this line
+
+        }
+      });
+
+      scene.add(heliumGroup);
+      heliumController.name('Hide Helium Levels');
+      console.log('Helium cloud loaded and visible');
+ 
+     
+        // Group Guardian Sites
+          guardianGroup = new THREE.Group();
+          guardianGroup.name = 'Guardian Sites';
+
+          [
+            ...guardian_ruins,
+            ...guardian_structures,
+            ...guardian_beacons,
+            ...guardian_connector   // now includes mesh11 group
+         ].forEach(mesh => guardianGroup.add(mesh));
+
+          scene.add(guardianGroup);
+          guardianController.name('Hide Guardian Sites');
+          console.log('Guardian Sites loaded and visible');
+
+    });
+
+  } else {
+    // Toggle visibility
+    heliumGroup.visible = !heliumGroup.visible;
+    heliumController.name(
+      heliumGroup.visible ? 'Hide Helium Levels' : 'Show Helium Levels'
+    );
+    console.log(`Helium cloud ${heliumGroup.visible ? 'shown' : 'hidden'}`);
+  }
+  
+}
+
+// funtion to adjust helium intensity vertex colors 
+function adjustVertexColors(obj, factor) {
+  const colors = obj.geometry.attributes.color;
+  const orig = obj.userData.originalColors;
+
+  const t = factor - 1;
+
+  for (let i = 0; i < colors.count; i++) {
+    let r = orig[i*3];
+    let g = orig[i*3+1];
+    let b = orig[i*3+2];
+
+    if (r > b) {
+      r = THREE.MathUtils.lerp(r, 1.0, t);
+      g = THREE.MathUtils.lerp(g, 0.0, t);
+      b = THREE.MathUtils.lerp(b, 0.0, t);
+    } else if (b > r) {
+      r = THREE.MathUtils.lerp(r, 0.0, t);
+      g = THREE.MathUtils.lerp(g, 0.0, t);
+      b = THREE.MathUtils.lerp(b, 1.0, t);
+    }
+
+    colors.setXYZ(i, r, g, b);
+  }
+
+  colors.needsUpdate = true;
+}
+
+function toggleGuardianSites() {
+  if (!guardianGroup) {
+    console.warn('Guardian Sites not yet loaded');
+    return;
+  }
+
+  guardianGroup.visible = !guardianGroup.visible;
+  guardianController.name(
+    guardianGroup.visible ? 'Hide Guardian Sites' : 'Show Guardian Sites'
+  );
+  console.log(`Guardian Sites ${guardianGroup.visible ? 'shown' : 'hidden'}`);
+}
 
 // add the nebulas 
   const labels = {
@@ -228,43 +464,270 @@ loader.load('./star_cloud.glb', gltf => {
     scene.add(label);
   });
 
+// set up modes for UI control 
+function initGUIs() {
+    // your full GUI setup block goes here
+    // (modeGUI, colonizationGUI, igauGUI, etc.)
 
 
-function setupGUI() {
-  // Global Controls GUI (wide, top)
-  const globalGUI = new GUI({ width: 500 });
-  globalGUI.domElement.style.position = 'absolute';
-  globalGUI.domElement.style.top = '10px';
-  globalGUI.domElement.style.left = '10px';
+  const modes = {
+    current: 'Colonization', // default
+    options: ['Colonization', 'IGAU Expeditions', 'DW3', 'Galaxy Science']
+  };
 
+  // Create a dedicated GUI for mode selection
+  const modeGUI = new GUI({ width: 600 });
+  modeGUI.domElement.style.position = 'absolute';
+  modeGUI.domElement.style.top = '10px';
+  modeGUI.domElement.style.left = '10px';
+
+  // --- Credits folder ---
+  const creditsFolder = modeGUI.addFolder('Credits');
+  creditsFolder.add({info: 'Spansh, EDGalaxydata.space, Edastro (permison for galaxy overlay)'}, 'info').name('Data Sources');
+  creditsFolder.add({info: 'IGAU , Mikkumm mercs  '}, 'info').name('Squadrons');
+  creditsFolder.add({info: 'Everyone who contributed data through EDDN etc'}, 'info').name('CMDRs')
+  creditsFolder.open();
+
+  const modeFolder = modeGUI.addFolder('Mode Selection');
+
+  // Create radio-style buttons
+  modes.options.forEach((label) => {
+    modeFolder.add({ select: () => {
+      if (modes.current !== label) {
+        modes.current = label;
+        switchMode(label);
+        updateRadioHighlight();
+      }
+    }}, 'select').name(label);
+  });
+
+function updateRadioHighlight() {
+  modeFolder.__controllers.forEach((controller) => {
+    const label = controller.name;
+    const isActive = label === modes.current;
+
+    const container = controller.domElement;
+    const funcDiv = container.querySelector('.function');
+
+    if (funcDiv) {
+      funcDiv.style.background = isActive ? '#4caf50' : '';
+      funcDiv.style.color = isActive ? '#fff' : '';
+      funcDiv.style.fontWeight = isActive ? 'bold' : '';
+      funcDiv.style.borderRadius = '4px';
+      funcDiv.style.padding = '4px 8px';
+      funcDiv.style.marginBottom = '4px';
+      funcDiv.style.textAlign = 'center';
+      funcDiv.style.cursor = 'pointer';
+      funcDiv.style.transition = 'background 0.3s ease';
+    }
+  });
+}
+
+  // Initialize highlight
+  setTimeout(updateRadioHighlight, 0);
+
+
+  // set up sub GUIs
+  const subGuiTop = '270px';
+  const subGuiLeft = '10px';
+
+  // Colonization sub-GUI
+  const colonizationGUI = new GUI({ width: 400 });
+  colonizationGUI.domElement.style.position = 'absolute';
+  colonizationGUI.domElement.style.top = subGuiTop;
+  colonizationGUI.domElement.style.left = subGuiLeft;
+
+  // Add a static header (not a folder)
+  const colonizationHeader = document.createElement('div');
+  colonizationHeader.innerText = 'Colonization Controls';
+  colonizationHeader.style.fontWeight = 'bold';
+  colonizationHeader.style.fontSize = '14px';
+  colonizationHeader.style.color = '#2196f3';
+  colonizationHeader.style.margin = '6px 0';
+
+  // Insert at the top of the GUI
+  colonizationGUI.domElement.prepend(colonizationHeader);
+
+
+  // Timeline slider + allegiance toggles go here
   const state = { step: 40 };
-  globalGUI.add(state, 'step', 1, 40, 1)
+    colonizationGUI.add(state, 'step', 0, 40, 1)
     .name('Visible Step')
     .onChange((val) => {
       Object.values(allegianceGroups).forEach((group) => {
         if (!group.visible) return;
+
         const meshes = [];
-        group.traverse((obj) => { if (obj.isPoints) meshes.push(obj); });
+        group.traverse((obj) => {
+          if (obj.isPoints) meshes.push(obj);
+        });
         meshes.sort((a, b) => a.name.localeCompare(b.name));
+
         meshes.forEach((m, i) => {
           m.visible = (i === 0) || (i <= val);
         });
       });
     });
 
-  // Allegiance Visibility GUI (narrow, shifted down)
-  const allegianceGUI = new GUI();
-  allegianceGUI.domElement.style.position = 'absolute';
-  allegianceGUI.domElement.style.top = '120px'; // push it down below the slider
-  allegianceGUI.domElement.style.left = '10px';
-
+  // Allegiance visibility toggles
   Object.keys(allegianceGroups).forEach((name) => {
     const group = allegianceGroups[name];
-    const folder = allegianceGUI.addFolder(name);
+    const folder = colonizationGUI.addFolder(name);
     folder.add(group, 'visible').name('Show/Hide');
   });
-}
+  
+  starCloudController = colonizationGUI
+  .add({ toggleStarCloud }, 'toggleStarCloud')
+  .name('Show Star Cloud'); // initial label
 
+
+  // Hide initially if not active
+  colonizationGUI.hide();
+
+  // Other mode GUIs
+
+  const igauGUI = new GUI({ width: 300 });
+  igauGUI.domElement.style.top = subGuiTop;
+  igauGUI.domElement.style.left = subGuiLeft;
+  igauGUI.add({ info: () => {} }, 'info').name('IGAU Controls');
+
+  // Add a static header (not a folder)
+  // IGAU
+  const IGAUHeader = document.createElement('div');
+  IGAUHeader.innerText = 'IGAU Expeditions Controls';
+  IGAUHeader.style.fontWeight = 'bold';
+  IGAUHeader.style.fontSize = '14px';
+  IGAUHeader.style.color = '#2196f3';
+  IGAUHeader.style.margin = '6px 0';
+
+  igauGUI.domElement.prepend(IGAUHeader);
+
+  igauGUI.hide();
+
+// DW controls 
+  const dw3GUI = new GUI({ width: 300 });
+  dw3GUI.domElement.style.top = subGuiTop;
+  dw3GUI.domElement.style.left = subGuiLeft;
+  dw3GUI.add({ info: () => {} }, 'info').name('DW3 Controls');
+  
+  // Add a static header (not a folder)
+  // DW3
+  const DW3Header = document.createElement('div');
+  DW3Header.innerText = 'DW3 Scientific Survey Controls';
+  DW3Header.style.fontWeight = 'bold';
+  DW3Header.style.fontSize = '14px';
+  DW3Header.style.color = '#2196f3';
+  DW3Header.style.margin = '6px 0';
+
+  dw3GUI.domElement.prepend(DW3Header);
+
+  dw3GUI.hide();
+
+// Add science folder control   
+  const scienceGUI = new GUI({ width: 300 });
+  scienceGUI.domElement.style.top = subGuiTop;
+  scienceGUI.domElement.style.left = subGuiLeft;
+  scienceGUI.add({ info: () => {} }, 'info').name('Science Controls');
+  
+    // Add a static header (not a folder)
+  const scienceHeader = document.createElement('div');
+  scienceHeader.innerText = 'Galactic Science Controls';
+  scienceHeader.style.fontWeight = 'bold';
+  scienceHeader.style.fontSize = '14px';
+  scienceHeader.style.color = '#2196f3';
+  scienceHeader.style.margin = '6px 0';
+
+  scienceGUI.domElement.prepend(scienceHeader);
+
+  galacticPlaneController = scienceGUI
+    .add({ toggleGalacticPlane }, 'toggleGalacticPlane')
+    .name('Show Galactic Plane');
+
+  scienceGUI.add(galacticPlaneState, 'opacity', 0, 1, 0.01)
+    .name('Galaxy Map Opacity')
+    .onChange((val) => {
+      if (galacticPlane) {
+        galacticPlane.material.opacity = val;
+        galacticPlane.material.transparent = true;
+      }
+    });
+
+  scienceGUI.add(galacticPlaneState, 'y', -20000, 20000, 20)
+    .name('Galaxy Map Y Position')
+    .onChange((val) => {
+      if (galacticPlane) {
+        galacticPlane.position.y = val;
+      }
+    });
+
+  heliumController = scienceGUI
+    .add({ toggleHeliumCloud }, 'toggleHeliumCloud')
+    .name('Show Helium Levels');
+
+  scienceGUI.add(heliumState, 'opacity', 0, 1, 0.01)
+    .name('Helium Opacity')
+    .onChange((val) => {
+      if (heliumGroup) {
+        heliumGroup.traverse(obj => {
+          if (obj.material) {
+            obj.material.opacity = val;
+            obj.material.transparent = true;
+          }
+        });
+      }
+    });
+
+    heliumState.colorIntensity = 1.0;
+    scienceGUI.add(heliumState, 'colorIntensity', 1.0, 2.0, 0.01)
+      .name('Helium Color Intensity')
+      .onChange((val) => {
+        if (heliumGroup) {
+          heliumGroup.traverse(obj => {
+            if (obj.geometry && obj.geometry.attributes.color && obj.userData.originalColors) {
+              adjustVertexColors(obj, val);
+            }
+          });
+        }
+      });
+
+    guardianController = scienceGUI
+      .add({ toggleGuardianSites }, 'toggleGuardianSites')
+      .name('Show Guardian Sites');
+
+  scienceGUI.hide();
+
+  function switchMode(mode) {
+    // Hide all sub-GUIs
+    colonizationGUI.hide();
+    igauGUI.hide();
+    dw3GUI.hide();
+    scienceGUI.hide();
+
+    // Show the one for the selected mode
+    if (mode === 'Colonization') {
+      colonizationGUI.show();
+      focusCameraOnColonization();
+      loadModeAssets('colonization');
+    } else if (mode === 'IGAU Expeditions') {
+      igauGUI.show();
+      focusCameraOnIGAU();
+      loadModeAssets('igau');
+    } else if (mode === 'DW3') {
+      dw3GUI.show();
+      focusCameraOnDW3();
+      loadModeAssets('dw3');
+    } else if (mode === 'Galaxy Science') {
+      scienceGUI.show();
+      focusCameraOnScience();
+      loadModeAssets('science');
+    }
+  }
+
+
+// run and reset 
+switchMode(modes.current);
+
+}
 
 function animate() {
   requestAnimationFrame(animate);
