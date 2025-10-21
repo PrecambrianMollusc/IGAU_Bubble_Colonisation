@@ -12,23 +12,41 @@
 <body>
 <script type="module">
   //Import modules
-  import * as THREE from 'https://unpkg.com/three@0.154.0/build/three.module.js';
-  import { GLTFLoader } from './GLTFLoader.js';
-  import { OrbitControls } from './OrbitControls.js';
+  import * as THREE from './js/three.module.js';
+  import { GLTFLoader } from './js/GLTFLoader.js';
+  import { DRACOLoader } from './js/DRACOLoader.js';
+  import { OrbitControls } from './js/OrbitControls.js';
+ import GUI from './js/lil-gui.esm.js';   // ← this is the file you downloaded
+
+  const loader = new GLTFLoader();
+  const dracoLoader = new DRACOLoader();
+  // Point this to the Draco decoder files (downloaded from three.js repo)
+  //dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/'); 
+  // or a local path like './draco/' if you host the decoder files yourself
+  dracoLoader.setDecoderPath('./draco/'); 
   
+  loader.setDRACOLoader(dracoLoader);
   // renderer , camera, scene, controls
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x111111);
- 
-  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+
+// Camera
+const aspect = window.innerWidth / window.innerHeight;
+const camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 120000);
+
+// Position the camera so it can see the scene
+camera.position.set(500, 4000, 4000);
+camera.lookAt(0, 0, 0);
+
   // Lighting section — right after camera
-  const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  
+  const ambient = new THREE.AmbientLight(0xffffff, 0.9);
   scene.add(ambient);
   
-  const hemi = new THREE.HemisphereLight(0x88ccff, 0x222244, 0.6);
+  const hemi = new THREE.HemisphereLight(0x88ccff, 0x222244, 0.8);
   scene.add(hemi);
    
-  const directional = new THREE.DirectionalLight(0xffffff, 0.2);
+  const directional = new THREE.DirectionalLight(0xffffff, 0.8);
   directional.position.set(1, 1, 1);
   scene.add(directional);
     
@@ -38,683 +56,229 @@
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
   console.log('Attempting to load GLTF...');
-  
-  // Create a UI container
-    const ui = document.createElement('div');
-    ui.style.position = 'absolute';
-    ui.style.top = '10px';
-    ui.style.left = '10px';
-    ui.style.background = 'rgba(0,0,0,0.7)';
-    ui.style.padding = '10px';
-    ui.style.color = 'white';
-    ui.style.fontFamily = 'sans-serif';
-    ui.style.zIndex = '10';
-    document.body.appendChild(ui);
   
   // Functions and helpers
   
-  // Create axis label sprites
-  function createAxisLabel_old(text, position, color = 0xffffff) {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      context.font = '24px sans-serif';
-      context.fillStyle = 'white';
-      context.fillText(text, 0, 24);
-    
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture, color });
-      const sprite = new THREE.Sprite(material);
-      sprite.position.copy(position);
-      sprite.scale.set(100, 50, 1);
-      return sprite;
-  }
-     
-  function createAxisLabelMesh(text, position, rotation, color = 0xffffff) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 64;
-    
-      const context = canvas.getContext('2d');
-      context.font = '28px sans-serif';
-      context.fillStyle = 'white';
-      context.textAlign = 'center';
-      context.textBaseline = 'middle';
-      context.fillText(text, canvas.width / 2, canvas.height / 2);
-    
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        color,
-  });
-    
-      const geometry = new THREE.PlaneGeometry(100, 40);
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.copy(position);
-      mesh.rotation.set(rotation.x, rotation.y, rotation.z);
-      return mesh;
-  }
-  
-  const subgroupStates = {
-      Independent: true,
-      Alliance: true,
-      Empire: true,
-      Federation: true,
-      IGAU: true,
-      Mikunn: true,
-      };  
-  
-  let activeState = 'before'; // default
 
-  //set up import of model 
-  let meshList = [];
-  let before_ind = [];
-  let after_ind = [];
-  let before_alliance = [];
-  let after_alliance = [];
-  let before_empire = [];
-  let after_empire = [];
-  let before_fed = [];
-  let after_fed = [];
-  let guardian = [];
-  let thargoid = [];
-  let before_IGAU = [];
-  let after_IGAU = [];
-  let before_mikunn = [];
-  let after_mikunn = [];
-  
-    
+  // get the disc sprite 
+  const sprite_sphere = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
+  sprite_sphere.colorSpace = THREE.SRGBColorSpace; // ensures correct color rendering
+  console.log('Sprite loaded:', sprite_sphere);
+
   // load the gtlf file 
-  const loader = new GLTFLoader();
-  loader.load('https://precambrianmollusc.github.io/IGAU_Bubble_Colonisation/vis_bubble.gltf', gltf => {
-    const model = gltf.scene;
-    scene.add(model);
-    console.log('GLTF loaded:', model);
+  // const loader = new GLTFLoader();
+  // set up list of files to load 
+  const allegianceFiles = [
+  { name: 'Empire',     url: './glbdata/vis_bubbleEmpire.gltf'},
+  { name: 'Federation', url: './glbdata/vis_bubbleFederation.gltf'},
+  { name: 'Alliance',   url: './glbdata/vis_bubbleAlliance.gltf'},
+  { name: 'Independent',   url: './glbdata/vis_bubbleIndependent.gltf'},
+  { name: 'IGAU',   url: './glbdata/vis_bubbleIGAU.gltf'},
+  { name: 'Mikunn',   url: './glbdata/vis_bubbleMikunn.gltf'},
+  { name: 'Guardian',   url: './glbdata/vis_bubbleGuardian.gltf'},
+  { name: 'Thargoid',   url: './glbdata/vis_bubbleThargoid.gltf'},
+];
 
-  // 🔍 Traverse and log to identoify all scene objects and get rid of any i doint want - I should clean up in the gtlf export!
-  scene.traverse(obj => {
-    console.log(`Object: ${obj.type}, name: ${obj.name || '(unnamed)'}, visible: ${obj.visible}`);
-     if (obj.name === 'mesh14' && obj.type === 'LineSegments') {
-      obj.visible = false; // or scene.remove(obj);
-      console.log('🔧 Hiding PyVista bounding box mesh14');
+const allegianceGroups = {}; // store loaded groups
+let loadedCount = 0;
+
+function applyPointMaterialSettings(group, sprite) {
+  group.traverse((obj) => {
+    if (obj.isPoints) {
+      obj.material.map = sprite;
+      obj.material.size = 5.0;
+      obj.material.opacity = 0.5;
+      obj.material.transparent = true;
+      obj.material.depthWrite = false;
+      obj.material.blending = THREE.AdditiveBlending;
+      obj.material.emissiveIntensity = 0.5;
+      obj.material.needsUpdate = true;
     }
-
   });
-    
-// Traverse the child looking for mesh and points so we can put into groups - at some point need to figure naming in the python export       
-    model.traverse(child => {
-       if (child.isMesh || child.type === 'Points') {
-        meshList.push(child);
-        if (child.name === 'mesh0') before_ind = child;
-        if (child.name === 'mesh1') after_ind = child;
-        if (child.name === 'mesh2') before_alliance = child;
-        if (child.name === 'mesh3') after_alliance = child;
-        if (child.name === 'mesh4' ) before_empire = child;
-        if (child.name === 'mesh5' ) after_empire = child;
-        if (child.name === 'mesh6' ) before_fed = child;
-        if (child.name === 'mesh7' ) after_fed = child;
-        if (child.name === 'mesh8' ) guardian = child;
-        if (child.name === 'mesh10') thargoid = child;
-        if (child.name === 'mesh11') before_IGAU = child;
-        if (child.name === 'mesh12') before_mikunn = child;
-        if (child.name === 'mesh13') after_IGAU = child;
-        if (child.name === 'mesh14') after_mikunn = child;
-        
-        console.log(`Mesh ${meshList.length - 1}:`, child.name || '(unnamed)', child);
+}
+
+// preload all GLTFs
+allegianceFiles.forEach(({ name, url}) => {
+  loader.load(
+    url,
+    (gltf) => {
+      console.log('Loaded', name, gltf);
+     
+
+      const group = new THREE.Group();
+      group.add(gltf.scene);
+      allegianceGroups[name] = group;
+      scene.add(group);
+      
+      applyPointMaterialSettings(group, sprite_sphere);
+
+      loadedCount++;
+      if (loadedCount === allegianceFiles.length) {
+        setupGUI(); // only once *all* are loaded
       }
-    });
-    
-    console.log('Total meshes found:', meshList.length);
+    },
+    undefined,
+    (err) => console.error(`Error loading ${url}`, err)
+  );
+});
 
-    // set up the meshes in groups 
-    // BEFORE meshes
-    const beforeMeshes = {
-      Independent: [before_ind],
-      Alliance: [before_alliance],
-      Empire: [before_empire],
-      Federation:[before_fed],
-      IGAU:[before_IGAU],
-      Mikunn:[before_mikunn]
-      };
-    
-    // AFTER meshes
-    const afterMeshes = {
-    Independent: [after_ind],
-      Alliance: [after_alliance],
-      Empire: [after_empire],
-      Federation:[after_fed],
-      IGAU:[after_IGAU],
-      Mikunn:[after_mikunn]
-        
-    };
 
-    // point cloud set up to make small spheres
-    const sprite_sphere = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
-    sprite_sphere.colorSpace = THREE.SRGBColorSpace; // ensures correct color rendering
-    console.log('Sprite loaded:', sprite_sphere);
-
-    // point cloud for before imdependent - should be a low opacity blur
-    before_ind.material.map = sprite_sphere;
-    before_ind.material.size = 4.0; // make points larger
-    before_ind.material.opacity = 0.5;
-    before_ind.material.transparent = true;
-    before_ind.material.depthWrite = false; // prevents z-fighting
-    before_ind.material.blending = THREE.AdditiveBlending;
-    before_ind.material.needsUpdate = true;
-
-    // point cloud for after independent - should be a low opacity blur
-    after_ind.material.map = sprite_sphere;
-    after_ind.material.size = 5.0; // make points larger
-    after_ind.material.opacity = 0.5;
-    after_ind.material.transparent = true;
-    after_ind.material.depthWrite = false; // prevents z-fighting
-    after_ind.material.blending = THREE.AdditiveBlending;
-    after_ind.material.needsUpdate = true;
-
-    // point cloud for all before alliance- should be a low opacity blur
-    before_alliance.material.map = sprite_sphere;
-    before_alliance.material.size = 5.0; // make points larger
-    before_alliance.material.opacity = 0.5;
-    before_alliance.material.transparent = true;
-    before_alliance.material.depthWrite = false; // prevents z-fighting
-    before_alliance.material.blending = THREE.AdditiveBlending;
-    before_alliance.material.needsUpdate = true;
-
-    // point cloud for all after alliance - should be a low opacity blur
-    after_alliance.material.map = sprite_sphere;
-    after_alliance.material.size = 5.0; // make points larger
-    after_alliance.material.opacity = 0.5;
-    after_alliance.material.transparent = true;
-    after_alliance.material.depthWrite = false; // prevents z-fighting
-    after_alliance.material.blending = THREE.AdditiveBlending;
-    after_alliance.material.needsUpdate = true;
-
-    // point cloud for  empire before- should be a low opacity blur
-    before_empire.material.map = sprite_sphere;
-    before_empire.material.size = 5.0; // make points larger
-    before_empire.material.opacity = 0.5;
-    before_empire.material.transparent = true;
-    before_empire.material.depthWrite = false; // prevents z-fighting
-    before_empire.material.blending = THREE.AdditiveBlending;
-    before_empire.material.needsUpdate = true;
-
-    // point cloud for empire after systems - should be a low opacity blur
-    after_empire.material.map = sprite_sphere;
-    after_empire.material.size = 5.0; // make points larger
-    after_empire.material.opacity = 0.5;
-    after_empire.material.transparent = true;
-    after_empire.material.depthWrite = false; // prevents z-fighting
-    after_empire.material.blending = THREE.AdditiveBlending;
-    after_empire.material.needsUpdate = true;
-    
-    // point cloud for fed before - should be a low opacity blur
-    before_fed.material.map = sprite_sphere;
-    before_fed.material.size = 5.0; // make points larger
-    before_fed.material.opacity = 0.5;
-    before_fed.material.transparent = true;
-    before_fed.material.depthWrite = false; // prevents z-fighting
-    before_fed.material.blending = THREE.AdditiveBlending;
-    before_fed.material.needsUpdate = true;
-
-    // point cloud for fed after systems - should be a low opacity blur
-    after_fed.material.map = sprite_sphere;
-    after_fed.material.size = 5.0; // make points larger
-    after_fed.material.opacity = 0.5;
-    after_fed.material.transparent = true;
-    after_fed.material.depthWrite = false; // prevents z-fighting
-    after_fed.material.blending = THREE.AdditiveBlending;
-    after_fed.material.needsUpdate = true;
-
-    // point cloud for all guardian- should be a low opacity blur
-    guardian.material.map = sprite_sphere;
-    guardian.material.size = 8.0; // make points larger
-    guardian.material.opacity = 0.4;
-    guardian.material.transparent = true;
-    guardian.material.depthWrite = false; // prevents z-fighting
-    guardian.material.blending = THREE.AdditiveBlending;
-    guardian.material.needsUpdate = true;
-
-    // point cloud for all thargoid - should be a low opacity blur
-    thargoid.material.map = sprite_sphere;
-    thargoid.material.size = 8.0; // make points larger
-    thargoid.material.opacity = 0.4;
-    thargoid.material.transparent = true;
-    thargoid.material.depthWrite = false; // prevents z-fighting
-    thargoid.material.blending = THREE.AdditiveBlending;
-    thargoid.material.needsUpdate = true;
-
-    // point cloud for IGAU before - should be a low opacity blur
-    before_IGAU.material.map = sprite_sphere;
-    before_IGAU.material.size = 6.0; // make points larger
-    before_IGAU.material.opacity = 0.6;
-    before_IGAU.material.transparent = true;
-    before_IGAU.material.depthWrite = false; // prevents z-fighting
-    before_IGAU.material.blending = THREE.AdditiveBlending;
-    // Gold color tweak
-    after_IGAU.material.color = new THREE.Color(0xffcc66); // warm gold
-    after_IGAU.material.emissive = new THREE.Color(0xffcc00); // bright gold glow
-    after_IGAU.material.emissiveIntensity = 0.5;
-    before_IGAU.material.needsUpdate = true;
-
-    // point cloud for IGAU after systems - should be a low opacity blur
-    after_IGAU.material.map = sprite_sphere;
-    after_IGAU.material.size = 6.0; // make points larger
-    after_IGAU.material.opacity = 0.6;
-    after_IGAU.material.transparent = true;
-    after_IGAU.material.depthWrite = false; // prevents z-fighting
-    after_IGAU.material.blending = THREE.AdditiveBlending;
-    // Gold color tweak
-    after_IGAU.material.color = new THREE.Color(0xffcc66); // warm gold
-    after_IGAU.material.emissive = new THREE.Color(0xffcc00); // bright gold glow
-    after_IGAU.material.emissiveIntensity = 0.5;
-    after_IGAU.material.needsUpdate = true;
-
-    before_mikunn.material = before_mikunn.material.clone();
-    // point cloud for mikunn before - should be a low opacity blur
-    before_mikunn.material.map = sprite_sphere;
-    before_mikunn.material.size = 6.0; // make points larger
-    before_mikunn.material.opacity = 0.6;
-    before_mikunn.material.transparent = true;
-    before_mikunn.material.depthWrite = false; // prevents z-fighting
-    before_mikunn.material.blending = THREE.AdditiveBlending;
-    // Silver color tweak
-    before_mikunn.material.color = new THREE.Color(0xc0c0c0); // classic silver gray
-    before_mikunn.material.emissive = new THREE.Color(0xddddff); // cool bluish-white glow
-    before_mikunn.material.emissiveIntensity = 0.4;
-    before_mikunn.material.needsUpdate = true;
-
-    after_mikunn.material = before_mikunn.material.clone();
-    // point cloud for mikunn after systems - should be a low opacity blur
-    after_mikunn.material.map = sprite_sphere;
-    after_mikunn.material.size = 6.0; // make points larger
-    after_mikunn.material.opacity = 0.6;
-    after_mikunn.material.transparent = true;
-    after_mikunn.material.depthWrite = false; // prevents z-fighting
-    after_mikunn.material.blending = THREE.AdditiveBlending;
-    // Silver color tweak
-    before_mikunn.material.color = new THREE.Color(0xc0c0c0); // classic silver gray
-    before_mikunn.material.emissive = new THREE.Color(0xddddff); // cool bluish-white glow
-    before_mikunn.material.emissiveIntensity = 0.4;
-    after_mikunn.material.needsUpdate = true;
+// add the galaxy G stars
+const scale = 45000 / 32000; // same as Python
+const center_gal = new THREE.Vector3(15918, -91, -1299); // from Python
   
-         const labels = {
+loader.load('./star_cloud.glb', gltf => {
+  const cloud = gltf.scene;
+ console.log('GLTF loaded-: ', cloud);
+
+  cloud.traverse(obj => {
+    if (obj.isPoints) {
+      const mat = obj.material;
+      mat.color.set(0xffa500);       // orange
+      mat.transparent = true;
+      sizeAttenuation: true,
+      mat.opacity = 0.03;              // low opacity
+      mat.size = 0.15;                 // small point size
+      mat.depthWrite = false;        // optional: improves blending
+      
+      mat.needsUpdate = true;
+    }
+  });
+ 
+  scene.add(cloud);
+});
+
+
+// add the nebulas 
+  const labels = {
       "NGC 133": [-954.0 ,-382.0, -397.0],
       "Orion Dark": [-1337, -312,603.0],
       "LBN 623 Nebula": [-332, -16,-499],
       "Witch Head Nebula": [-718 -385, 359],
-      "Veil East Nebula": [486 ,-307, -1920],
+      "California Nebula": [-927 -211, -337],
+      "Barnards's Loop": [-1224 -421, 617],
+      "Veil Nebula West": [418 ,-193, -1398],
+      "Sadr": [356 ,53, -1794],
+      "Pelican Nebula": [174 ,-1, -1886],
       "Coal Sack Nebula": [212, 43,501],
-      "Lagoon Nebula": [ 4474,-92,-486]     
+      "Lagoon Nebula": [ 4474,-92,-486],
+      "Triffid Nebula": [5162,-26.3,-638]     
     };
-    
-    const nebulaMaterial = new THREE.MeshPhongMaterial({
-      color: 0x9966ff,           // Ethereal violet
-      transparent: true,
-      opacity: 0.3,
-      shininess: 80,
-      emissive: 0x330066,
-      emissiveIntensity: 0.5,
+      
+  const nebulaMaterial = new THREE.MeshPhongMaterial({
+    color: 0x9966ff,           // Ethereal violet
+    transparent: true,
+    opacity: 0.3,
+    shininess: 80,
+    emissive: 0x330066,
+    emissiveIntensity: 0.5,
     });
-    
-const createTextSprite = (text) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;  // Wider canvas for longer labels
-  canvas.height = 128;
-
-  const context = canvas.getContext('2d');
-  context.font = 'Bold 48px Arial';
-  context.fillStyle = 'rgba(255,255,255,0.8)';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(text, canvas.width / 2, canvas.height / 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(150, 50, 1); // Wider scale to match canvas
-  return sprite;
-};
-
-
-Object.entries(labels).forEach(([name, pos]) => {
-  // Ethereal sphere
-  const sphere = new THREE.Mesh(
-    new THREE.SphereGeometry(40, 32, 32),
-    new THREE.MeshPhongMaterial({
-      color: 0x9966ff,
-      transparent: true,
-      opacity: 0.3,
-      emissive: 0x330066,
-      emissiveIntensity: 0.5,
-    })
-  );
-  sphere.position.set(...pos);
-  scene.add(sphere);
-
-  // Sprite label
-  const label = createTextSprite(name);
-  label.position.set(pos[0], pos[1] + 60, pos[2]); // Offset above sphere
-  scene.add(label);
-});
-  
-    
-  // add the bounding box 
-          const box = new THREE.Box3().setFromObject(model);
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
-          console.log('Bounding box size:', size);
-          console.log('Bounding box center:', center);
       
-          camera.position.set(center.x, center.y, center.z + size.length());
-          controls.target.copy(center);
-          controls.update();
-  
-          const boxHelper = new THREE.BoxHelper(model, 0x888888);
-          scene.add(boxHelper);
-          const min = box.min;
-          const max = box.max;
-          const offset = size.length() * 0.1;
+  const createTextSprite = (text) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;  // Wider canvas for longer labels
+    canvas.height = 128;
 
-          const labelX = createAxisLabelMesh('Galactic Z', new THREE.Vector3(min.x + offset, min.y, min.z), new THREE.Euler(0, 0, 0));
-          const labelY = createAxisLabelMesh('Galactic Y', new THREE.Vector3(min.x, min.y + offset, min.z), new THREE.Euler(0, 0, Math.PI / 2));
-          const labelZ = createAxisLabelMesh('Galactic X', new THREE.Vector3(min.x, min.y, min.z + offset), new THREE.Euler( 0,  - Math.PI / 2, 0));        
-              
-          const labelScale = size.length() * 0.0004; // 20% of diagonal length
-          labelX.scale.set(labelScale, labelScale * 0.5, 1);
-          labelY.scale.set(labelScale, labelScale * 0.5, 1);
-          labelZ.scale.set(labelScale, labelScale * 0.5, 1);
-    
-          scene.add(labelX, labelY, labelZ);
-          
-          const arrowLength = size.length() * 0.02;
-          const arrowX = new THREE.ArrowHelper(
-            new THREE.Vector3(1, 0, 0), // direction: +X
-            box.min,                    // origin: bounding box corner
-            arrowLength,
-            0xff4444                    // red
-          );
-          
-          const arrowY = new THREE.ArrowHelper(
-            new THREE.Vector3(0, 1, 0), // direction: +Y
-            box.min,
-            arrowLength,
-            0x44ff44                    // green
-          );
-          
-          const arrowZ = new THREE.ArrowHelper(
-            new THREE.Vector3(0, 0, 1), // direction: +Z
-            box.min,
-            arrowLength,
-            0x4444ff                    // blue
-          );
-          
-          scene.add(arrowX, arrowY, arrowZ);
-        
-    // single visibility updater (uses beforeMeshes and afterMeshes)
-  function updateVisibility() {
-    Object.keys(subgroupStates).forEach(groupName => {
-      const enabled = !!subgroupStates[groupName];
-      (beforeMeshes[groupName] || []).forEach(m => { if (m) m.visible = (activeState === 'before' && enabled); });
-      (afterMeshes[groupName]  || []).forEach(m => { if (m) m.visible = (activeState === 'after'  && enabled); });
-    });
-  }
+    const context = canvas.getContext('2d');
+    context.font = 'Bold 48px Arial';
+    context.fillStyle = 'rgba(255,255,255,0.8)';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(text, canvas.width / 2, canvas.height / 2);
 
-  // reusable toggle builder. If isMaster is true, checkbox flips before/after; otherwise it's a subgroup toggle.
-  function addGroupToggle(groupArray, labelText, isMaster = false, groupKey = null) {
-    const label = document.createElement('label');
-    label.style.display = 'block';
-    label.style.marginTop = '8px';
-  
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.style.marginRight = '6px';
-  
-    if (isMaster) {
-      // master visual match: checked => before, unchecked => after
-      checkbox.checked = (activeState === 'before');
-      checkbox.addEventListener('change', (e) => {
-        activeState = e.target.checked ? 'before' : 'after';
-        updateVisibility();
-      });
-    } else {
-      const key = groupKey || labelText.replace(/\s+/g, '');
-      subgroupStates[key] = subgroupStates[key] ?? true;
-      checkbox.checked = !!subgroupStates[key];
-      checkbox.addEventListener('change', (e) => {
-        subgroupStates[key] = e.target.checked;
-        updateVisibility();
-      });
-    }
-  
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(labelText));
-    ui.appendChild(label);
-  }
-        
-    
-    // master toggle (looks same as other checkboxes)
-        addGroupToggle(null, 'Check for before colonisation', true);
-        
-        // subgroup toggles that control both before/after groups
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
 
-        addGroupToggle(beforeMeshes.Independent.concat(afterMeshes.Independent), 'Independent', false, 'Independent');
-        addGroupToggle(beforeMeshes.Alliance.concat(afterMeshes.Alliance), 'Alliance', false, 'Alliance');
-        addGroupToggle(beforeMeshes.Empire.concat(afterMeshes.Empire), 'Empire', false, 'Empire');
-        addGroupToggle(beforeMeshes.Federation.concat(afterMeshes.Federation), 'Federation', false, 'Federation');
-        addGroupToggle(beforeMeshes.IGAU.concat(afterMeshes.IGAU), 'IGAU', false, 'IGAU');
-        addGroupToggle(beforeMeshes.Mikunn.concat(afterMeshes.Mikunn), 'Mikunn', false, 'Mikunn');
-  
-      // initialize visibility once
-        updateVisibility();
-        
-      const bboxLabel = document.createElement('label');
-      bboxLabel.style.display = 'block';
-      bboxLabel.style.marginTop = '10px';
-      
-      const bboxCheckbox = document.createElement('input');
-      bboxCheckbox.type = 'checkbox';
-      bboxCheckbox.checked = true;
-      bboxCheckbox.style.marginRight = '6px';
-      
-      bboxCheckbox.addEventListener('change', () => {
-        const visible = bboxCheckbox.checked;
-        boxHelper.visible = visible;
-        labelX.visible = visible;
-        labelY.visible = visible;
-        labelZ.visible = visible;
-        console.log('Bounding box and labels visibility set to', visible);
-      });
-      
-      bboxLabel.appendChild(bboxCheckbox);
-      bboxLabel.appendChild(document.createTextNode('Show Bounding Box & Labels'));
-      ui.appendChild(bboxLabel);
-  
-      // set up some legends 
-      const createLegendLabel = (text, color, position) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-      ctx.font = 'Bold 48px Arial';
-      ctx.fillStyle = color;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-      const sprite = new THREE.Sprite(material);
-      sprite.scale.set(150, 50, 1);
-      sprite.position.copy(position);
-      scene.add(sprite);
-      };
-    
-    // Example usage
-    //createLegendLabel("Independent", "#ffcc00", new THREE.Vector3(0, 300, 0));
-    //createLegendLabel("IGAU Nebulas", "#9966ff", new THREE.Vector3(0, 250, 0));
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(150, 50, 1); // Wider scale to match canvas
+    return sprite;
+  };
 
 
-    // Define your manual focus point
-      const focusPoint = new THREE.Vector3(0, 0, 0); // Change to any desired coordinates
-      
-      // Set camera position
-      camera.position.set(-1000, 1500, -1500); // Adjust as needed
-      
-        // Force camera to look at the focus point
-      camera.lookAt(focusPoint);
-      
-      // Override OrbitControls target
-      controls.target.copy(focusPoint);
-      controls.update();
-      
-      // Optional: Visual marker for debugging
-      const marker = new THREE.Mesh(
-        new THREE.SphereGeometry(5),
-        new THREE.MeshBasicMaterial({ color: 0xff0000 })
-      );
-      marker.position.copy(focusPoint);
-      scene.add(marker);
-      
-      // Log for diagnostics
-      console.log("📍 Camera Position:", camera.position.clone());
-      console.log("🎯 Focus Point:", focusPoint.clone());
-      console.log("🕹️ OrbitControls Target:", controls.target.clone());
+  Object.entries(labels).forEach(([name, pos]) => {
+    // Ethereal sphere
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(40, 32, 32),
+      new THREE.MeshPhongMaterial({
+        color: 0x9966ff,
+        transparent: true,
+        opacity: 0.3,
+        emissive: 0x330066,
+        emissiveIntensity: 0.5,
+      })
+    );
+    sphere.position.set(...pos);
+    scene.add(sphere);
 
-
-function addTitleAndCreditsUI(initialTitle = 'Colonisation Progress', initialCredits = `Survey Leader: N/A
-CMDRs: 
-many many many
-temporary key : 
-Blueish - guardian
-Green blobby - Thargoid
-Yellow - Independent 
-Green - Alliance
-Blue - Empire
-Red - Federation
-Gold- IGAU
-Silver - Mikunn
-Credits: 
-Data from Spansh, EDGALAXYdata.space
-everyone who contributes data to the feeds`) {
-  const metaWrap = document.createElement('div');
-  metaWrap.style.marginTop = '12px';
-  metaWrap.style.paddingTop = '8px';
-  metaWrap.style.borderTop = '1px solid rgba(255,255,255,0.08)';
-  metaWrap.style.fontSize = '13px';
-  metaWrap.id = 'metaWrap';
-
-  const titleLabel = document.createElement('label');
-  titleLabel.style.display = 'block';
-  titleLabel.style.marginBottom = '6px';
-  titleLabel.style.fontWeight = '600';
-  titleLabel.textContent = 'IGAU Survey project';
-  metaWrap.appendChild(titleLabel);
-
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.value = initialTitle;
-  titleInput.style.width = '220px';
-  titleInput.style.display = 'block';
-  titleInput.style.marginBottom = '10px';
-  titleInput.style.padding = '6px';
-  titleInput.style.background = 'rgba(255,255,255,0.04)';
-  titleInput.style.color = 'white';
-  titleInput.style.border = '1px solid rgba(255,255,255,0.08)';
-  titleInput.style.borderRadius = '3px';
-  titleInput.id = 'vizTitleInput';
-  metaWrap.appendChild(titleInput);
-
-  const creditsLabel = document.createElement('label');
-  creditsLabel.style.display = 'block';
-  creditsLabel.style.marginBottom = '6px';
-  creditsLabel.style.fontWeight = '600';
-  creditsLabel.textContent = 'Credits and Data Contributors';
-  metaWrap.appendChild(creditsLabel);
-
-  const creditsArea = document.createElement('textarea');
-  creditsArea.value = initialCredits;
-  creditsArea.rows = 18;
-  creditsArea.style.width = '220px';
-  creditsArea.style.padding = '6px';
-  creditsArea.style.background = 'rgba(255,255,255,0.04)';
-  creditsArea.style.color = 'white';
-  creditsArea.style.border = '1px solid rgba(255,255,255,0.08)';
-  creditsArea.style.borderRadius = '3px';
-  creditsArea.style.resize = 'vertical';
-  creditsArea.id = 'vizCreditsArea';
-  metaWrap.appendChild(creditsArea);
-
-  const btn = document.createElement('button');
-  btn.textContent = 'Hide Info';
-  btn.style.display = 'block';
-  btn.style.marginTop = '8px';
-  btn.style.padding = '6px 8px';
-  btn.style.background = 'rgba(255,255,255,0.06)';
-  btn.style.color = 'white';
-  btn.style.border = '1px solid rgba(255,255,255,0.12)';
-  btn.style.borderRadius = '3px';
-  btn.id = 'metaToggleBtn';
-  metaWrap.appendChild(btn);
-
-  const preview = document.createElement('div');
-  preview.style.marginTop = '8px';
-  preview.style.fontSize = '14px';
-  preview.style.fontWeight = '600';
-  preview.style.display = 'none';
-  preview.style.whiteSpace = 'pre-wrap';
-  preview.id = 'metaPreview';
-  metaWrap.appendChild(preview);
-
-  ui.appendChild(metaWrap);
-
-  function updatePreview() {
-    const title = titleInput.value.trim() || 'Untitled Visualization';
-    const credits = creditsArea.value.trim();
-    preview.textContent = `${title}\n\n${credits}`;
-  }
-
-  btn.addEventListener('click', () => {
-    const hidden = titleInput.style.display === 'none';
-    if (hidden) {
-      titleInput.style.display = 'block';
-      creditsArea.style.display = 'block';
-      preview.style.display = 'none';
-      btn.textContent = 'Hide Info';
-    } else {
-      titleInput.style.display = 'none';
-      creditsArea.style.display = 'none';
-      preview.style.display = 'block';
-      btn.textContent = 'Show Info';
-      updatePreview();
-    }
+    // Sprite label
+    const label = createTextSprite(name);
+    label.position.set(pos[0], pos[1] + 60, pos[2]); // Offset above sphere
+    scene.add(label);
   });
 
-  titleInput.addEventListener('input', updatePreview);
-  creditsArea.addEventListener('input', updatePreview);
-  updatePreview();
 
-  return { metaWrap, titleInput, creditsArea, btn, preview };
+
+function setupGUI() {
+  // Global Controls GUI (wide, top)
+  const globalGUI = new GUI({ width: 500 });
+  globalGUI.domElement.style.position = 'absolute';
+  globalGUI.domElement.style.top = '10px';
+  globalGUI.domElement.style.left = '10px';
+
+  const state = { step: 40 };
+  globalGUI.add(state, 'step', 1, 40, 1)
+    .name('Visible Step')
+    .onChange((val) => {
+      Object.values(allegianceGroups).forEach((group) => {
+        if (!group.visible) return;
+        const meshes = [];
+        group.traverse((obj) => { if (obj.isPoints) meshes.push(obj); });
+        meshes.sort((a, b) => a.name.localeCompare(b.name));
+        meshes.forEach((m, i) => {
+          m.visible = (i === 0) || (i <= val);
+        });
+      });
+    });
+
+  // Allegiance Visibility GUI (narrow, shifted down)
+  const allegianceGUI = new GUI();
+  allegianceGUI.domElement.style.position = 'absolute';
+  allegianceGUI.domElement.style.top = '120px'; // push it down below the slider
+  allegianceGUI.domElement.style.left = '10px';
+
+  Object.keys(allegianceGroups).forEach((name) => {
+    const group = allegianceGroups[name];
+    const folder = allegianceGUI.addFolder(name);
+    folder.add(group, 'visible').name('Show/Hide');
+  });
 }
 
-// Usage (call after ui exists, e.g., inside buildUIAndInit)
-const metaControls = addTitleAndCreditsUI();
 
-    
-}); // ← closes loader.load
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
 
-    
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-    //labelX.lookAt(camera.position);
-    //labelY.lookAt(camera.position);
-    //labelZ.lookAt(camera.position);
-  }
+  const pos = camera.position;
+  const tgt = controls.target;
+  //info.textContent =
+  //  `Camera: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}) ` +
+  //  `Target: (${tgt.x.toFixed(1)}, ${tgt.y.toFixed(1)}, ${tgt.z.toFixed(1)})`;
+
+  renderer.render(scene, camera);
+}
+
   animate();
   
   
