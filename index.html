@@ -69,6 +69,8 @@ camera.lookAt(0, 0, 0);
   console.log('Attempting to load GLTF...');
   
   // Functions and helpers
+let selectionState;
+let selectionController;
   
 
   // get the disc sprite 
@@ -134,26 +136,98 @@ allegianceFiles.forEach(({ name, url}) => {
 });
 
 // load star cloud 
+function createStarCloudMaterial(
+  camera,
+  {
+    sizeNear = 6.0,     // size when very close
+    sizeFar = 0.05,      // size when very far
+    opacityNear = 0.7,   // opacity when very close
+    opacityFar = 0.02,   // opacity when very far
+    biasPower = 1.5      // controls steepness of ramp-up
+  } = {}
+) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uSizeNear:     { value: sizeNear },
+      uSizeFar:      { value: sizeFar },
+      uOpacityNear:  { value: opacityNear },
+      uOpacityFar:   { value: opacityFar },
+      uNear:         { value: camera.near },
+      uFar:          { value: camera.far },
+      uBiasPower:    { value: biasPower }
+    },
+    vertexShader: `
+      uniform float uSizeNear;
+      uniform float uSizeFar;
+      uniform float uNear;
+      uniform float uFar;
+      uniform float uBiasPower;
+
+      varying float vBiasT;
+
+      void main() {
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+
+        float dist = -mvPosition.z;
+
+        // Log-normalized distance
+        float logNear = log(uNear + 1.0);
+        float logFar  = log(uFar + 1.0);
+        float logDist = log(dist + 1.0);
+        float t = clamp((logDist - logNear) / (logFar - logNear), 0.0, 1.0);
+
+        // Bias so stars stay small/faint longer, then ramp up steeply when close
+        float biasedT = 1.0 - pow(1.0 - t, uBiasPower);
+        vBiasT = biasedT;
+
+        // Interpolate size: far = small, near = big
+        float size = mix(uSizeFar, uSizeNear, 1.0 - biasedT);
+        gl_PointSize = clamp(size, 1.0, 20.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uOpacityNear;
+      uniform float uOpacityFar;
+      varying float vBiasT;
+
+      void main() {
+        vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+        if (dot(cxy, cxy) > 1.0) discard;
+
+        // Interpolate opacity: far = faint, near = bright
+        float alpha = mix(uOpacityFar, uOpacityNear, 1.0 - vBiasT);
+
+        gl_FragColor = vec4(1.0, 0.65, 0.0, alpha); // orange stars
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+}
+
 let starCloud = null;
 let starCloudController; // reference to the GUI button
 
+
 function toggleStarCloud() {
   if (!starCloud) {
-    // First time: load and keep reference
     loader.load('./star_cloud.glb', (gltf) => {
       starCloud = gltf.scene;
 
       starCloud.traverse((obj) => {
         if (obj.isPoints) {
-          const mat = obj.material;
-          mat.color.set(0xffa500);
-          mat.transparent = true;
-          mat.opacity = 0.03;
-          mat.size = 0.15;
-          mat.depthWrite = false;
-          mat.needsUpdate = true;
+          obj.material = createStarCloudMaterial(camera, {
+          sizeNear: 6,
+          sizeFar: 0.05,
+          opacityNear: 0.8,
+          opacityFar: 0.02,
+          biasPower: 1.5
+        });
         }
       });
+
 
       scene.add(starCloud);
       starCloud.visible = true;
@@ -178,6 +252,63 @@ function toggleStarCloud() {
   }
 }
 
+// add the colony targets 
+let colonyCloud = null;
+let colonyCloudController; // reference to the GUI button
+
+function toggleColonyCloud() {
+  if (!colonyCloud) {
+    loader.load('./colonytargetCloud.glb', (gltf) => {
+      colonyCloud = gltf.scene;
+
+      colonyCloud.traverse((obj) => {
+        if (obj.isPoints) {
+          // You can reuse your star material or make a new one
+          obj.material = createStarCloudMaterial(camera, {
+            sizeNear: 8,
+            sizeFar: 0.1,
+            opacityNear: 1.0,
+            opacityFar: 0.05,
+            biasPower: 2.0
+          });
+        }
+      });
+
+          colonyCloud.traverse(obj => {
+      console.log(obj.type, obj.name, obj.geometry);
+      if (obj.geometry) {
+        console.log(Object.keys(obj.geometry.attributes));
+      }
+    });
+
+      scene.add(colonyCloud);
+      colonyCloud.visible = true;
+
+      if (colonyCloudController) {
+        colonyCloudController.name('Hide Colony Targets');
+      }
+
+      console.log('Colony target cloud loaded and visible');
+    });
+  } else {
+    // Already loaded: just toggle visibility
+    colonyCloud.visible = !colonyCloud.visible;
+
+    if (colonyCloudController) {
+      colonyCloudController.name(
+        colonyCloud.visible ? 'Hide Colony Targets' : 'Show Colony Targets'
+      );
+    }
+
+    console.log(
+      `Colony target cloud ${colonyCloud.visible ? 'shown' : 'hidden'}`
+    );
+  }
+}
+
+
+
+
 let galacticPlane = null;
 let galacticPlaneController;
 const galacticPlaneState = {
@@ -194,7 +325,7 @@ function toggleGalacticPlane() {
     const groundGeometry = new THREE.PlaneGeometry(width, height, 1, 1);
     const textureLoader = new THREE.TextureLoader();
     const groundTexture = textureLoader.load(
-      'https://precambrianmollusc.github.io/Galaxy_He_levels/gamegalaxy-4500px.png'
+      './galaxyscience/gamegalaxy-4500px.png'
     );
 
     const groundMaterial = new THREE.MeshBasicMaterial({
@@ -569,16 +700,56 @@ function updateRadioHighlight() {
       });
     });
 
-  // Allegiance visibility toggles
-  Object.keys(allegianceGroups).forEach((name) => {
-    const group = allegianceGroups[name];
-    const folder = colonizationGUI.addFolder(name);
-    folder.add(group, 'visible').name('Show/Hide');
-  });
-  
-  starCloudController = colonizationGUI
+  // Allegiance visibility toggles (all under one folder)
+const allegianceFolder = colonizationGUI.addFolder('Allegiances');
+
+Object.keys(allegianceGroups).forEach((name) => {
+  const group = allegianceGroups[name];
+  allegianceFolder.add(group, 'visible').name(name);
+});
+
+
+  // Add a toggle button to your GUI
+    starCloudController = colonizationGUI
   .add({ toggleStarCloud }, 'toggleStarCloud')
   .name('Show Star Cloud'); // initial label
+
+  // Add a toggle button to your GUI
+  colonyCloudController = colonizationGUI
+  .add({ toggleColonyCloud }, 'toggleColonyCloud')
+  .name('Show Colony Targets'); // initial label
+
+
+
+  // --- Selection Results folder ---
+  const selectionFolder = colonizationGUI.addFolder('Selection Results');
+
+  // global state object
+// global state object with instructions
+  selectionState = { points: "Toggle Star Clound on\nPress 'B' to toggle search box\nPress 'N' to analyze points" };
+  
+
+  // add to GUI
+  selectionController = selectionFolder.add(selectionState, 'points').name('Points Inside Box');
+
+ // After you create selectionController
+const inputEl = selectionController.domElement.querySelector('input');
+const textarea = document.createElement('textarea');
+textarea.style.width = '100%';
+textarea.style.height = '200px';
+textarea.style.whiteSpace = 'pre';
+textarea.style.fontFamily = 'monospace';
+
+// Replace input with textarea
+inputEl.parentNode.replaceChild(textarea, inputEl);
+
+// Hook it up to reflect selectionState.points
+selectionController.__textarea = textarea;
+selectionController.updateDisplay = function () {
+  textarea.value = selectionState.points;
+};
+selectionController.updateDisplay();
+
 
 
   // Hide initially if not active
@@ -727,17 +898,218 @@ function updateRadioHighlight() {
 // run and reset 
 switchMode(modes.current);
 
+
+
 }
+
+
+  const targetMarkerGeometry = new THREE.SphereGeometry(5, 16, 16);
+    const targetMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const targetMarker = new THREE.Mesh(targetMarkerGeometry, targetMarkerMaterial);
+    scene.add(targetMarker);
+
+    // Global reference
+    let targetLine;
+
+    // Create once
+    function initTargetLine() {
+      const geom = new THREE.BufferGeometry();
+      const positions = new Float32Array(6); // 2 points * 3 coords
+      geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const mat = new THREE.LineBasicMaterial({ color: 0x00ff00 }); // thin green line
+      targetLine = new THREE.Line(geom, mat);
+      scene.add(targetLine);
+    }
+    initTargetLine()
+        const baseMarker = new THREE.Mesh(
+      new THREE.CircleGeometry(5, 32),
+      new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+    );
+    baseMarker.rotation.x = -Math.PI / 2; // lay flat
+    scene.add(baseMarker);
+
+
+function handleKeyDown(event) {
+    const moveDistance = 100; // Adjust as needed
+    const targetMoveDistance = 100; // Adjust as needed
+
+    switch (event.key) {
+        // W: Move camera forward (along z-axis)
+        case 'w':
+            camera.position.x -= moveDistance;
+            controls.target.x -= targetMoveDistance;
+            break;
+        // S: Move camera backward
+        case 's':
+            camera.position.x += moveDistance;
+            controls.target.x += targetMoveDistance;
+            break;
+        // A: Move camera left (along x-axis)
+        case 'a':
+            camera.position.z -= moveDistance;
+            controls.target.z -= targetMoveDistance;
+            break;
+        // D: Move camera right
+        case 'd':
+            camera.position.z += moveDistance;
+            controls.target.z += targetMoveDistance;
+            break;
+        // Q: Move camera up (along y-axis)
+        case 'q':
+            camera.position.y += moveDistance;
+            controls.target.y += targetMoveDistance;
+            break;
+        // E: Move camera down
+        case 'e':
+            camera.position.y -= moveDistance;
+            controls.target.y -= targetMoveDistance;
+            break;
+        
+            // b: Creat search box arround target
+        case 'b' :
+             toggleSearchBox();
+            break;
+        case 'n':
+            if (searchBox && searchBox.visible) {
+              analyzePointsInBox(searchBox);
+            }
+            break;
+
+    }
+    // 5. Update controls after moving
+    controls.update();
+}
+
+
+document.addEventListener('keydown', handleKeyDown, false);
+
+
+// Global reference
+let searchBox;
+
+function initSearchBox() {
+  const boxGeometry = new THREE.BoxGeometry(100, 100, 100);
+  const boxMaterial = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    wireframe: true
+  });
+
+  searchBox = new THREE.Mesh(boxGeometry, boxMaterial);
+  searchBox.visible = false; // hidden by default
+  scene.add(searchBox);
+
+  // Precompute bounding box once
+  searchBox.geometry.computeBoundingBox();
+}
+
+initSearchBox()
+
+function toggleSearchBox() {
+  if (!searchBox) return;
+
+  // Flip visibility
+  searchBox.visible = !searchBox.visible;
+
+  if (searchBox.visible) {
+    // Snap immediately to camera target
+    searchBox.position.copy(controls.target);
+  } else {
+    // Reset to instructions when hiding
+    if (selectionState) {
+      selectionState.points = "Press 'B' to toggle search box\nPress 'N' to analyze points";
+      if (selectionController) selectionController.updateDisplay();
+    }
+  }
+}
+
+
+function analyzePointsInBox(targetBox) {
+  const pointsInside = [];
+
+  // Build a Box3 in world space from the targetBox mesh
+  const box = new THREE.Box3().setFromObject(targetBox);
+
+  // Traverse colonyCloud to find the Points object(s)
+  colonyCloud.traverse(obj => {
+    if (obj.isPoints && obj.geometry && obj.geometry.attributes.position) {
+      const positions = obj.geometry.attributes.position;
+      const pos = new THREE.Vector3();
+
+      for (let i = 0; i < positions.count; i++) {
+        pos.fromBufferAttribute(positions, i);
+
+        // Convert to world coordinates
+        const worldPos = pos.clone();
+        obj.localToWorld(worldPos);
+
+        // Test against the world-space box
+        if (box.containsPoint(worldPos)) {
+          pointsInside.push({
+            x: worldPos.x,
+            y: worldPos.y,
+            z: worldPos.z
+          });
+        }
+      }
+    }
+  });
+
+  updateGuiWithPoints(pointsInside);
+}
+
+
+function updateGuiWithPoints(pointsInside) {
+  if (pointsInside.length === 0) {
+    selectionState.points = 'No points found';
+  } else {
+    selectionState.points = pointsInside
+      .map(p => `(${p.z.toFixed(2)}, ${p.y.toFixed(2)}, ${p.x.toFixed(2)})`)
+      .join('\n');   // <-- newline between each coordinate set
+  }
+  selectionController.updateDisplay();
+}
+
+
 
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
 
-  const pos = camera.position;
-  const tgt = controls.target;
-  //info.textContent =
-  //  `Camera: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}) ` +
-  //  `Target: (${tgt.x.toFixed(1)}, ${tgt.y.toFixed(1)}, ${tgt.z.toFixed(1)})`;
+  // Update marker to follow controls.target
+    targetMarker.position.copy(controls.target);
+
+    // Update line endpoints
+    if (targetLine) {
+      const pos = targetLine.geometry.attributes.position.array;
+
+      // Start at marker
+      pos[0] = targetMarker.position.x;
+      pos[1] = targetMarker.position.y;
+      pos[2] = targetMarker.position.z;
+
+      // End at Y=0 plane directly below
+      pos[3] = targetMarker.position.x;
+      pos[4] = 0;
+      pos[5] = targetMarker.position.z;
+
+      targetLine.geometry.attributes.position.needsUpdate = true;
+    }
+    
+    baseMarker.position.set(targetMarker.position.x, 0, targetMarker.position.z);
+
+    
+
+    // follow search box 
+    if (searchBox && searchBox.visible) {
+      searchBox.position.copy(controls.target);
+    }
+      const dist = camera.position.distanceTo(controls.target);
+
+      // For debugging in console
+      console.log('Camera → Target distance:', dist.toFixed(2));
+
+
 
   renderer.render(scene, camera);
 }
