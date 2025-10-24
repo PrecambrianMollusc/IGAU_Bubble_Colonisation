@@ -595,6 +595,53 @@ function toggleGuardianSites() {
     scene.add(label);
   });
 
+  // function to add the steller density scans
+    let densityscanCloud = null;
+    let densityscanController; // reference to the GUI button
+
+    function toggledensityscanCloud() {
+      if (!densityscanCloud) {
+        loader.load('./DW3/scans.glb', (gltf) => {
+          densityscanCloud = gltf.scene;
+
+          densityscanCloud.traverse(obj => {
+          console.log(obj.type, obj.name, obj.geometry);
+          if (obj.geometry) {
+            console.log(Object.keys(obj.geometry.attributes));
+          }
+        });
+
+          scene.add(densityscanCloud);
+          densityscanCloud.visible = true;
+
+          if (densityscanController) {
+            densityscanController.name('Hide Density Scans');
+          }
+
+          console.log('Density Scan loaded and visible');
+        });
+      } else {
+        // Already loaded: just toggle visibility
+        densityscanCloud.visible = !densityscanCloud.visible;
+
+        if (densityscanController) {
+          densityscanController.name(
+            densityscanCloud.visible ? 'Hide Density Scan' : 'Show Density Scan'
+          );
+        }
+
+        console.log(
+          `density scan ${densityscanCloud.visible ? 'shown' : 'hidden'}`
+        );
+      }
+    }
+
+
+
+
+
+
+
 // set up modes for UI control 
 function initGUIs() {
     // your full GUI setup block goes here
@@ -703,10 +750,29 @@ function updateRadioHighlight() {
   // Allegiance visibility toggles (all under one folder)
 const allegianceFolder = colonizationGUI.addFolder('Allegiances');
 
+// Add master toggle
+const allegianceState = { allVisible: true };
+
+allegianceFolder.add(allegianceState, 'allVisible')
+  .name('Show All')
+  .onChange((val) => {
+    Object.values(allegianceGroups).forEach(group => {
+      group.visible = val;
+    });
+    // Update the GUI checkboxes for each group
+    allegianceFolder.__controllers.forEach(ctrl => {
+      if (ctrl.property === 'visible') {
+        ctrl.setValue(val);
+      }
+    });
+  });
+
+// Add individual toggles
 Object.keys(allegianceGroups).forEach((name) => {
   const group = allegianceGroups[name];
   allegianceFolder.add(group, 'visible').name(name);
 });
+
 
 
   // Add a toggle button to your GUI
@@ -791,6 +857,33 @@ selectionController.updateDisplay();
   DW3Header.style.margin = '6px 0';
 
   dw3GUI.domElement.prepend(DW3Header);
+
+  densityscanController = dw3GUI
+    .add({ toggledensityscanCloud }, 'toggledensityscanCloud')
+    .name('Show density Scans');
+
+  galacticPlaneController = dw3GUI
+      .add({ toggleGalacticPlane }, 'toggleGalacticPlane')
+      .name('Show Galactic Plane');
+
+    dw3GUI.add(galacticPlaneState, 'opacity', 0, 1, 0.01)
+      .name('Galaxy Map Opacity')
+      .onChange((val) => {
+        if (galacticPlane) {
+          galacticPlane.material.opacity = val;
+          galacticPlane.material.transparent = true;
+        }
+      });
+
+    dw3GUI.add(galacticPlaneState, 'y', -20000, 20000, 20)
+      .name('Galaxy Map Y Position')
+      .onChange((val) => {
+        if (galacticPlane) {
+          galacticPlane.position.y = val;
+        }
+      });
+
+
 
   dw3GUI.hide();
 
