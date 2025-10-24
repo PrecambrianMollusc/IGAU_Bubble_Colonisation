@@ -67,7 +67,12 @@ camera.lookAt(0, 0, 0);
   });
 
   console.log('Attempting to load GLTF...');
-  
+ 
+  // For picking
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+
   // Functions and helpers
 let selectionState;
 let selectionController;
@@ -252,12 +257,66 @@ function toggleStarCloud() {
   }
 }
 
+
+// Utility to set point size for all Points in a group
+function setPointSize(group, size) {
+  group.traverse(obj => {
+    if (obj.isPoints) {
+      obj.material.size = size;
+      obj.material.needsUpdate = true;
+    }
+  });
+}
+
+function setAllegiancePointSize(size) {
+  Object.values(allegianceGroups).forEach(group => {
+    group.traverse(obj => {
+      if (obj.isPoints) {
+        obj.material.size = size;
+        obj.material.needsUpdate = true;
+      }
+    });
+  });
+}
+
+function focusCameraOnObject(object, controls) {
+  // Compute bounding box in world space
+  const box = new THREE.Box3().setFromObject(object);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+
+  // Update OrbitControls target
+  controls.target.copy(center);
+  controls.update();
+
+  // Optionally move camera back a bit so the object fits in view
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+
+  cameraZ *= 1.5; // add some padding
+  camera.position.set(center.x, center.y, center.z + cameraZ);
+  camera.lookAt(center);
+}
+
+
+
 // add the colony targets 
 let colonyCloud = null;
 let colonyCloudController; // reference to the GUI button
+let colonyMeta = [];
 
 function toggleColonyCloud() {
   if (!colonyCloud) {
+
+      fetch('./colonytargetCloud_meta.json')
+    .then(res => res.json())
+    .then(data => {
+      colonyMeta = data;
+    });
+
     loader.load('./colonytargetCloud.glb', (gltf) => {
       colonyCloud = gltf.scene;
 
@@ -265,7 +324,7 @@ function toggleColonyCloud() {
         if (obj.isPoints) {
           // You can reuse your star material or make a new one
           obj.material = createStarCloudMaterial(camera, {
-            sizeNear: 8,
+            sizeNear: 12,
             sizeFar: 0.1,
             opacityNear: 1.0,
             opacityFar: 0.05,
@@ -273,16 +332,16 @@ function toggleColonyCloud() {
           });
         }
       });
-
-          colonyCloud.traverse(obj => {
-      console.log(obj.type, obj.name, obj.geometry);
-      if (obj.geometry) {
-        console.log(Object.keys(obj.geometry.attributes));
-      }
-    });
+     
 
       scene.add(colonyCloud);
       colonyCloud.visible = true;
+      
+      // Boost allegiance groups when colony targets are shown
+      setAllegiancePointSize(14.0);
+      // Focus camera on colony cloud
+      focusCameraOnObject(colonyCloud, controls);
+
 
       if (colonyCloudController) {
         colonyCloudController.name('Hide Colony Targets');
@@ -293,6 +352,13 @@ function toggleColonyCloud() {
   } else {
     // Already loaded: just toggle visibility
     colonyCloud.visible = !colonyCloud.visible;
+
+    // Adjust allegiance group sizes depending on visibility
+    if (colonyCloud.visible) {
+      setAllegiancePointSize(14.0);
+    } else {
+      setAllegiancePointSize(5.0);
+    }
 
     if (colonyCloudController) {
       colonyCloudController.name(
@@ -305,8 +371,6 @@ function toggleColonyCloud() {
     );
   }
 }
-
-
 
 
 let galacticPlane = null;
@@ -1123,46 +1187,67 @@ function analyzePointsInBox(targetBox) {
   // Build a Box3 in world space from the targetBox mesh
   const box = new THREE.Box3().setFromObject(targetBox);
 
-  // Traverse colonyCloud to find the Points object(s)
-  colonyCloud.traverse(obj => {
-    if (obj.isPoints && obj.geometry && obj.geometry.attributes.position) {
-      const positions = obj.geometry.attributes.position;
-      const pos = new THREE.Vector3();
 
-      for (let i = 0; i < positions.count; i++) {
-        pos.fromBufferAttribute(positions, i);
+colonyCloud.traverse(obj => {
+  if (obj.isPoints && obj.geometry && obj.geometry.attributes.position) {
+    const positions = obj.geometry.attributes.position;
+    const pos = new THREE.Vector3();
 
-        // Convert to world coordinates
-        const worldPos = pos.clone();
-        obj.localToWorld(worldPos);
+    for (let i = 0; i < positions.count; i++) {
+      pos.fromBufferAttribute(positions, i);
 
-        // Test against the world-space box
-        if (box.containsPoint(worldPos)) {
-          pointsInside.push({
-            x: worldPos.x,
-            y: worldPos.y,
-            z: worldPos.z
-          });
-        }
+      // Convert to world coordinates
+      const worldPos = pos.clone();
+      obj.localToWorld(worldPos);
+
+      // Test against the world-space box
+      if (box.containsPoint(worldPos)) {
+        const meta = colonyMeta[i];   // <-- lookup by index
+        pointsInside.push({
+          id64: meta?.systemId64,
+          x: worldPos.z,
+          y: worldPos.y,
+          z: worldPos.x
+        });
       }
     }
-  });
+  }
+});
 
   updateGuiWithPoints(pointsInside);
 }
-
 
 function updateGuiWithPoints(pointsInside) {
   if (pointsInside.length === 0) {
     selectionState.points = 'No points found';
   } else {
     selectionState.points = pointsInside
-      .map(p => `(${p.z.toFixed(2)}, ${p.y.toFixed(2)}, ${p.x.toFixed(2)})`)
-      .join('\n');   // <-- newline between each coordinate set
+      .map(p => `ID:${p.id64} (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`)
+      .join('\n');
   }
   selectionController.updateDisplay();
 }
 
+
+function onClick(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(colonyCloud, true);
+
+  if (intersects.length > 0) {
+    const intersect = intersects[0];
+    const idx = intersect.index; // vertex index
+    const meta = colonyMeta[idx];
+
+  if (meta) {
+    selectionState.points = `ID:${meta.systemId64} (${intersect.point.x.toFixed(2)}, ${intersect.point.y.toFixed(2)}, ${intersect.point.z.toFixed(2)})`;
+    selectionController.updateDisplay();
+  }
+
+  }
+}
 
 
 function animate() {
@@ -1208,7 +1293,8 @@ function animate() {
 }
 
   animate();
-  
+renderer.domElement.addEventListener("click", onClick);
+
   
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
