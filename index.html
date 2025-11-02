@@ -701,7 +701,78 @@ function toggleGuardianSites() {
     }
 
 
+// --- IsoLevel GLBs (reversed: high → low) ---
+const isoFiles = [
+  { level: "1e-1", file: "KDEglb/iso_0.1_draco.glb" },
+  { level: "1e-2", file: "KDEglb/iso_0.01_draco.glb" },
+  { level: "1e-3", file: "KDEglb/iso_0.001_draco.glb" },
+  { level: "1e-4", file: "KDEglb/iso_0.0001_draco.glb" },
+  { level: "1e-5", file: "KDEglb/iso_1e-05_draco.glb" },
+  { level: "1e-6", file: "KDEglb/iso_1e-06_draco.glb" },
+  { level: "1e-7", file: "KDEglb/iso_1e-07_draco.glb" }
+];
 
+const isoMeshes = [];
+let isoGroup = null;
+let isoController;
+
+// --- Toggle loader ---
+function toggleIsoGroup() {
+  if (!isoGroup) {
+    isoGroup = new THREE.Group();
+    scene.add(isoGroup);
+
+    isoFiles.forEach((iso, idx) => {
+      loader.load(iso.file, (gltf) => {
+        const mesh = gltf.scene;
+        mesh.visible = false; // start hidden
+        isoGroup.add(mesh);
+        isoMeshes[idx] = mesh;
+
+        // Style this mesh immediately
+        styleSingleIsoMesh(mesh, idx, isoFiles.length);
+
+
+      });
+    });
+    
+
+    if (isoController) {
+      isoController.name('Hide IsoLevels');
+    }
+    console.log('IsoLevels loaded');
+  } else {
+    // Toggle visibility of the whole group
+    isoGroup.visible = !isoGroup.visible;
+    if (isoController) {
+      isoController.name(isoGroup.visible ? 'Hide IsoLevels' : 'Show IsoLevels');
+    }
+    console.log(`IsoLevels ${isoGroup.visible ? 'shown' : 'hidden'}`);
+  }
+}
+
+function styleSingleIsoMesh(mesh, idx, total) {
+  // Normalized 0 → 1 across the stack, but inverted
+  const t = 1 - (idx / (total - 1));
+
+  // Now index 0 (highest density) → solid & red,
+  // last index (lowest density) → faint & blue
+  const opacity = 0.15 + 0.5 * t;   // 0.75 → 0.15 across stack
+  const hue = 0.6 - 0.6 * t;        // 0.0 (red) at core → 0.6 (blue) outer
+  const color = new THREE.Color().setHSL(hue, 1.0, 0.5);
+
+  mesh.traverse(obj => {
+    if (obj.isMesh) {
+      obj.material = new THREE.MeshStandardMaterial({
+        color: color,
+        transparent: true,
+        opacity: opacity,
+        depthWrite: false,   // helps blending
+        side: THREE.DoubleSide
+      });
+    }
+  });
+}
 
 
 
@@ -906,7 +977,9 @@ selectionController.updateDisplay();
   igauGUI.hide();
 
 // DW controls 
-  const dw3GUI = new GUI({ width: 300 });
+
+
+const dw3GUI = new GUI({ width: 300 });
   dw3GUI.domElement.style.top = subGuiTop;
   dw3GUI.domElement.style.left = subGuiLeft;
   dw3GUI.add({ info: () => {} }, 'info').name('DW3 Controls');
@@ -946,6 +1019,29 @@ selectionController.updateDisplay();
           galacticPlane.position.y = val;
         }
       });
+  // --- New IsoLevel controls ---
+
+
+  const isoState = { slider: 0 };
+   
+  isoController = dw3GUI
+  .add({ toggleIsoGroup }, 'toggleIsoGroup')
+  .name('Show IsoLevels');
+
+  
+  
+  dw3GUI.add(isoState, 'slider', 0, isoFiles.length, 1)
+    .name('IsoLevel Slider')
+    .onChange((val) => {
+      isoMeshes.forEach((m, i) => {
+        if (m) {
+          // show meshes up to the slider value, hide the rest
+          m.visible = (i < val);
+        }
+      });
+    });
+
+
 
 
 
