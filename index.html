@@ -662,21 +662,48 @@ function toggleGuardianSites() {
   // function to add the steller density scans
     let densityscanCloud = null;
     let densityscanController; // reference to the GUI button
+    let teapot = null;
 
     function toggledensityscanCloud() {
       if (!densityscanCloud) {
+        // First load the density scans
         loader.load('./DW3/scans.glb', (gltf) => {
           densityscanCloud = gltf.scene;
 
           densityscanCloud.traverse(obj => {
-          console.log(obj.type, obj.name, obj.geometry);
-          if (obj.geometry) {
-            console.log(Object.keys(obj.geometry.attributes));
-          }
-        });
+            console.log(obj.type, obj.name, obj.geometry);
+            if (obj.geometry) {
+              console.log(Object.keys(obj.geometry.attributes));
+            }
+          });
 
           scene.add(densityscanCloud);
           densityscanCloud.visible = true;
+
+          // Now load the teapot
+          loader.load('./DW3/the_utah_teapot.glb', (gltf2) => {
+            teapot = gltf2.scene;
+            teapot.position.set(13300, -500, -1000);
+            teapot.scale.set(8, 8, 8);   // 20× bigger in all directions
+            // Override materials for a golden glow
+            teapot.traverse(obj => {
+              if (obj.isMesh) {
+                obj.material = new THREE.MeshStandardMaterial({
+                  color: 0xffd700,        // base gold
+                  metalness: 0.8,         // metallic sheen
+                  roughness: 0.3,         // a bit of gloss
+                  emissive: 0xffa500,     // warm orange-gold glow
+                  emissiveIntensity: 1.5  // crank this up for "self-lit" look
+                });
+                obj.castShadow = true;
+                obj.receiveShadow = true;
+              }
+            });
+
+
+            scene.add(teapot);
+            teapot.visible = true;
+          });
 
           if (densityscanController) {
             densityscanController.name('Hide Density Scans');
@@ -687,6 +714,7 @@ function toggleGuardianSites() {
       } else {
         // Already loaded: just toggle visibility
         densityscanCloud.visible = !densityscanCloud.visible;
+        if (teapot) teapot.visible = !teapot.visible;
 
         if (densityscanController) {
           densityscanController.name(
@@ -695,11 +723,11 @@ function toggleGuardianSites() {
         }
 
         console.log(
-          `density scan ${densityscanCloud.visible ? 'shown' : 'hidden'}`
+          `density scan ${densityscanCloud.visible ? 'shown' : 'hidden'}, ` +
+          `teapot ${teapot && teapot.visible ? 'shown' : 'hidden'}`
         );
       }
     }
-
 
 // --- IsoLevel GLBs (reversed: high → low) ---
 const isoFiles = [
@@ -774,6 +802,84 @@ function styleSingleIsoMesh(mesh, idx, total) {
   });
 }
 
+// Globals
+let clipPlanes = [];
+let clippingEnabled = false;
+let clipController;   // <— add this
+
+
+// Discrete thickness values
+const thicknessSteps = [10, 20, 40, 80, 150, 300, 600, 1200, 2500, 5000, 10000, 20000, 40000, 90000];
+
+// Axis-specific ranges
+const axisRanges = {
+  x: { min: -20000, max: 70000 },
+  y: { min: -10000, max: 10000 },
+  z: { min: -45000, max: 45000 }
+};
+
+// State
+const clipState = {
+  axis: 'x',
+  center: 0,
+  thicknessIndex: 0
+};
+
+function currentThickness() {
+  return thicknessSteps[clipState.thicknessIndex] ?? thicknessSteps[0];
+}
+
+function applyClippingPlanes() {
+  if (!clippingEnabled) return;
+
+  const { axis, center, thicknessIndex } = clipState;
+  const thickness = currentThickness();
+  const half = thickness / 2;
+
+  let normal;
+  if (axis === 'x') normal = new THREE.Vector3(1, 0, 0);
+  else if (axis === 'y') normal = new THREE.Vector3(0, 1, 0);
+  else normal = new THREE.Vector3(0, 0, 1);
+
+  const minVal = center - half;
+  const maxVal = center + half;
+
+  const planeMin = new THREE.Plane(normal.clone(), -minVal);
+  const planeMax = new THREE.Plane(normal.clone().negate(), maxVal);
+
+  clipPlanes = [planeMin, planeMax];
+
+  isoMeshes.forEach(m => {
+    if (!m) return;
+    m.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        obj.material.clippingPlanes = clipPlanes;
+        obj.material.clipShadows = true;
+      }
+    });
+  });
+}
+
+function toggleClippingSlab() {
+  if (!clippingEnabled) {
+    renderer.localClippingEnabled = true;
+    clippingEnabled = true;
+    applyClippingPlanes();
+    if (clipController) clipController.name('Disable Clipping Slab');
+  } else {
+    renderer.localClippingEnabled = false;
+    isoMeshes.forEach(m => {
+      if (!m) return;
+      m.traverse(obj => {
+        if (obj.isMesh && obj.material) {
+          obj.material.clippingPlanes = [];
+        }
+      });
+    });
+    clippingEnabled = false;
+    if (clipController) clipController.name('Enable Clipping Slab');
+  }
+}
 
 
 
@@ -789,7 +895,7 @@ function initGUIs() {
   };
 
   // Create a dedicated GUI for mode selection
-  const modeGUI = new GUI({ width: 600 });
+  const modeGUI = new GUI({ width: 300 });
   modeGUI.domElement.style.position = 'absolute';
   modeGUI.domElement.style.top = '10px';
   modeGUI.domElement.style.left = '10px';
@@ -845,7 +951,7 @@ function updateRadioHighlight() {
   const subGuiLeft = '10px';
 
   // Colonization sub-GUI
-  const colonizationGUI = new GUI({ width: 400 });
+  const colonizationGUI = new GUI({ width: 300 });
   colonizationGUI.domElement.style.position = 'absolute';
   colonizationGUI.domElement.style.top = subGuiTop;
   colonizationGUI.domElement.style.left = subGuiLeft;
@@ -977,75 +1083,123 @@ selectionController.updateDisplay();
   igauGUI.hide();
 
 // DW controls 
-
-
+// DW controls
 const dw3GUI = new GUI({ width: 300 });
-  dw3GUI.domElement.style.top = subGuiTop;
-  dw3GUI.domElement.style.left = subGuiLeft;
-  dw3GUI.add({ info: () => {} }, 'info').name('DW3 Controls');
-  
-  // Add a static header (not a folder)
-  // DW3
-  const DW3Header = document.createElement('div');
-  DW3Header.innerText = 'DW3 Scientific Survey Controls';
-  DW3Header.style.fontWeight = 'bold';
-  DW3Header.style.fontSize = '14px';
-  DW3Header.style.color = '#2196f3';
-  DW3Header.style.margin = '6px 0';
+dw3GUI.domElement.style.top = subGuiTop;
+dw3GUI.domElement.style.left = subGuiLeft;
+dw3GUI.add({ info: () => {} }, 'info').name('DW3 Controls');
 
-  dw3GUI.domElement.prepend(DW3Header);
+// Add a static header
+const DW3Header = document.createElement('div');
+DW3Header.innerText = 'DW3 Scientific Survey Controls';
+DW3Header.style.fontWeight = 'bold';
+DW3Header.style.fontSize = '14px';
+DW3Header.style.color = '#2196f3';
+DW3Header.style.margin = '6px 0';
+dw3GUI.domElement.prepend(DW3Header);
 
-  densityscanController = dw3GUI
-    .add({ toggledensityscanCloud }, 'toggledensityscanCloud')
-    .name('Show density Scans');
+// --- Density scan toggle ---
+densityscanController = dw3GUI
+  .add({ toggledensityscanCloud }, 'toggledensityscanCloud')
+  .name('Show density Scans');
 
-  galacticPlaneController = dw3GUI
-      .add({ toggleGalacticPlane }, 'toggleGalacticPlane')
-      .name('Show Galactic Plane');
+// --- Galactic plane toggle + controls ---
+galacticPlaneController = dw3GUI
+  .add({ toggleGalacticPlane }, 'toggleGalacticPlane')
+  .name('Show Galactic Plane');
 
-    dw3GUI.add(galacticPlaneState, 'opacity', 0, 1, 0.01)
-      .name('Galaxy Map Opacity')
-      .onChange((val) => {
-        if (galacticPlane) {
-          galacticPlane.material.opacity = val;
-          galacticPlane.material.transparent = true;
-        }
-      });
+dw3GUI.add(galacticPlaneState, 'opacity', 0, 1, 0.01)
+  .name('Galaxy Map Opacity')
+  .onChange((val) => {
+    if (galacticPlane) {
+      galacticPlane.material.opacity = val;
+      galacticPlane.material.transparent = true;
+    }
+  });
 
-    dw3GUI.add(galacticPlaneState, 'y', -20000, 20000, 20)
-      .name('Galaxy Map Y Position')
-      .onChange((val) => {
-        if (galacticPlane) {
-          galacticPlane.position.y = val;
-        }
-      });
-  // --- New IsoLevel controls ---
+dw3GUI.add(galacticPlaneState, 'y', -20000, 20000, 20)
+  .name('Galaxy Map Y Position')
+  .onChange((val) => {
+    if (galacticPlane) {
+      galacticPlane.position.y = val;
+    }
+  });
 
+// --- IsoLevel controls ---
+const isoState = { slider: 0 };
 
-  const isoState = { slider: 0 };
-   
-  isoController = dw3GUI
+isoController = dw3GUI
   .add({ toggleIsoGroup }, 'toggleIsoGroup')
   .name('Show IsoLevels');
 
-  
-  
-  dw3GUI.add(isoState, 'slider', 0, isoFiles.length, 1)
-    .name('IsoLevel Slider')
-    .onChange((val) => {
-      isoMeshes.forEach((m, i) => {
-        if (m) {
-          // show meshes up to the slider value, hide the rest
-          m.visible = (i < val);
-        }
-      });
+dw3GUI.add(isoState, 'slider', 0, isoFiles.length, 1)
+  .name('IsoLevel Slider')
+  .onChange((val) => {
+    isoMeshes.forEach((m, i) => {
+      if (m) {
+        m.visible = (i < val);
+      }
     });
+  });
+
+// --- Clipping slab controls ---
+clipController = dw3GUI
+  .add({ toggleClippingSlab }, 'toggleClippingSlab')
+  .name('Enable Clipping Slab');
 
 
+// Discrete thickness steps
+const thicknessSteps = [10, 20, 40, 80, 150, 300, 600, 1200, 2500, 5000, 10000, 20000, 40000, 90000];
+clipState.thicknessIndex = 0;
+
+// Center slider
+const centerController = dw3GUI.add(
+  clipState,
+  'center',
+  axisRanges.x.min,
+  axisRanges.x.max,
+  100
+).name('Slice Center')
+ .onChange(applyClippingPlanes);
+
+// Thickness slider
+const thicknessController = dw3GUI.add(
+  clipState,
+  'thicknessIndex',
+  0,
+  thicknessSteps.length - 1,
+  1
+).name('Slice Thickness')
+ .onChange(() => {
+   applyClippingPlanes();
+   updateThicknessLabel();
+});
+
+// Label updater
+function updateThicknessLabel() {
+  const idx = Math.max(0, Math.min(clipState.thicknessIndex, thicknessSteps.length - 1));
+  const val = thicknessSteps[idx];
+  thicknessController.name(`Slice Thickness: ${val}`);
+}
+updateThicknessLabel();
+
+// Axis selector (AFTER center/thickness controllers exist)
+dw3GUI.add(clipState, 'axis', ['x','y','z']).name('Clip Axis').onChange((axis) => {
+  const r = axisRanges[axis];
+  clipState.center = (r.min + r.max) / 2;
+  centerController.min(r.min).max(r.max).setValue(clipState.center);
+
+  clipState.thicknessIndex = 0;
+  thicknessController.setValue(clipState.thicknessIndex);
+  updateThicknessLabel();
+
+  applyClippingPlanes();
+});
+
+// Optional: hide GUI after setup
+dw3GUI.hide();
 
 
-
-  dw3GUI.hide();
 
 // Add science folder control   
   const scienceGUI = new GUI({ width: 300 });
@@ -1184,8 +1338,8 @@ switchMode(modes.current);
 
 
 function handleKeyDown(event) {
-    const moveDistance = 100; // Adjust as needed
-    const targetMoveDistance = 100; // Adjust as needed
+    const moveDistance = 10; // Adjust as needed
+    const targetMoveDistance = 10; // Adjust as needed
 
     switch (event.key) {
         // W: Move camera forward (along z-axis)
